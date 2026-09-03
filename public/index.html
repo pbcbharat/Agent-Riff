@@ -44,38 +44,6 @@
 
     <main class="workspace">
       <div class="workspace-shell">
-      <section class="room-bar" aria-labelledby="room-heading">
-        <div class="room-identity">
-          <span class="eyebrow" id="room-heading">Live room</span>
-          <div class="room-code-wrap">
-            <strong id="room-code">SOLO</strong>
-            <span id="room-state">Private rehearsal</span>
-          </div>
-        </div>
-
-        <div class="room-actions">
-          <button class="button secondary" id="new-room" type="button">
-            <span aria-hidden="true">＋</span> New room
-          </button>
-          <form id="join-form" class="join-form" autocomplete="off">
-            <label class="sr-only" for="join-code">Room key</label>
-            <input
-              id="join-code"
-              name="room"
-              maxlength="9"
-              placeholder="ROOM KEY"
-              spellcheck="false"
-              aria-describedby="join-help"
-            />
-            <button class="button primary" type="submit">Join</button>
-          </form>
-          <button class="icon-button" id="copy-room" type="button" aria-label="Copy room invitation" disabled>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v11H8z"></path><path d="M5 16H3V3h13v2"></path></svg>
-          </button>
-        </div>
-        <p class="sr-only" id="join-help">Enter the room key shared by another player.</p>
-      </section>
-
       <div class="stage-grid">
         <aside class="control-rail" aria-label="Performance controls">
           <section class="rail-section instrument-section">
@@ -114,7 +82,7 @@
             <div class="range-labels" aria-hidden="true"><span>Slow</span><span>Fast</span></div>
           </section>
 
-          <section class="rail-section room-tonality">
+          <section class="rail-section compass-section">
             <span class="eyebrow">Shared compass</span>
             <div class="tonality-row">
               <label>Key
@@ -162,18 +130,17 @@
                 <span>Metronome</span>
                 <span class="transport-state" id="metronome-state">Off</span>
               </button>
-              <button id="clear" class="transport-button" type="button" title="Clear notes and activity; room and musical settings stay unchanged">Clear notes</button>
+              <button id="clear" class="transport-button" type="button" title="Clear notes and activity; musical settings stay unchanged">Clear notes</button>
             </div>
           </div>
 
-          <div class="score-window" aria-label="Recent notes in the room">
+          <div class="score-window" aria-label="Recent notes in the session">
             <div class="score-lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
             <div class="playhead" id="playhead" aria-hidden="true"></div>
             <div class="note-field" id="note-field" aria-hidden="true"></div>
             <div class="score-empty" id="score-empty">
               <span class="listening-rings" aria-hidden="true"><i></i><i></i><i></i></span>
-              <p>The room is listening</p>
-              <small>Touch a key or use your computer keyboard</small>
+              <p>Touch a key or use your computer keyboard</p>
             </div>
           </div>
 
@@ -196,17 +163,16 @@
             <div class="agent-orbit" aria-hidden="true"><span>✦</span></div>
             <div>
               <span class="eyebrow">Agent seat</span>
-              <h2 id="agent-name">Open chair</h2>
-              <p id="agent-message">Create a room, then share its key with your browser agent.</p>
+              <h2 id="agent-name">Waiting for agent</h2>
+              <p id="agent-message">Ask your browser agent to use TuneIn’s WebMCP tools.</p>
             </div>
-            <span class="seat-status" id="agent-status">Waiting</span>
           </section>
 
-          <section class="agent-performance" aria-labelledby="agent-performance-heading">
+          <section class="agent-performance" aria-label="Agent performance">
             <div class="agent-performance-heading">
               <div>
                 <span class="eyebrow">Agent performance</span>
-                <h2 id="agent-performance-heading">Waiting for a phrase</h2>
+                <h2 id="agent-performance-heading"></h2>
               </div>
               <span class="agent-playing-dot" id="agent-playing-dot" aria-hidden="true"></span>
             </div>
@@ -223,7 +189,7 @@
             <span class="spark" aria-hidden="true">✦</span>
             <div>
               <strong>Try saying</strong>
-              <p>“Join <span id="prompt-room">my room</span>, listen to my last phrase, then answer on violin.”</p>
+              <p>“Use TuneIn’s WebMCP tools to join this session for a live jam.”</p>
             </div>
             <button class="icon-button small" id="copy-prompt" type="button" aria-label="Copy agent prompt">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v11H8z"></path><path d="M5 16H3V3h13v2"></path></svg>

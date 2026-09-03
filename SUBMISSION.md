@@ -6,19 +6,19 @@ Play a thought together.
 
 ## Short description
 
-TuneIn is a live music board where a person and their browser agent improvise together. The person plays a phrase; the agent joins with a room key, listens through structured WebMCP tools, chooses a complementary instrument, and answers in time.
+TuneIn is a live music board where a person and their browser agent improvise together. The person plays a phrase; the agent joins the current page session through structured WebMCP tools, chooses a complementary instrument, and answers in time.
 
 ## Full project description
 
-Most music software treats AI as a generator behind a prompt box. TuneIn treats the agent as another musician in the room.
+Most music software treats AI as a generator behind a prompt box. TuneIn treats the agent as another musician in the session.
 
-A person opens the board, creates a room, and plays on a responsive instrument using touch, mouse, or keyboard. Their performance becomes shared musical context: recent notes, instrument voices, tempo, key, scale, density, and pitch center. A browser agent can join the room with WebMCP, inspect that context, listen before acting, and perform a precisely timed answer on piano, violin, trumpet, or synth. The shared score makes every human and agent contribution visible.
+A person opens the board and plays on a responsive instrument using touch, mouse, or keyboard. Their performance becomes shared musical context: recent notes, instrument voices, tempo, key, scale, density, and pitch center. A browser agent can join the current page session with WebMCP, inspect that context, listen before acting, and perform a precisely timed answer on piano, violin, trumpet, or synth. The shared score makes every human and agent contribution visible.
 
 The result is a conversation instead of a one-shot generation. The person supplies instinct and expression. The agent supplies attention, recall, and a second musical voice. Each new phrase changes what a good next response should be.
 
 ## Why WebMCP is a strong fit
 
-A screenshot can show piano keys, but it cannot reliably communicate the timing and musical meaning of what just happened. WebMCP gives the agent a compact contract for joining a room, reading live state, analyzing a phrase, and contributing notes with explicit beat offsets and durations. The agent can act through the same product logic as a person while the person stays in the loop and sees every action.
+A screenshot can show piano keys, but it cannot reliably communicate the timing and musical meaning of what just happened. WebMCP gives the agent a compact contract for joining the page session, reading live state, analyzing a phrase, and contributing notes with explicit beat offsets and durations. The agent can act through the same product logic as a person while the person stays in the loop and sees every action.
 
 Without WebMCP, the agent would have to infer notes from pixels and click keys at fragile screen coordinates. With WebMCP, it can reason about music and spend its effort on the creative choice.
 
@@ -34,13 +34,14 @@ This back-and-forth is difficult to achieve with a traditional chatbot or an age
 
 ## WebMCP implementation
 
-TuneIn uses the current imperative API at `document.modelContext.registerTool()` and registers five focused tools:
+TuneIn uses the current imperative API at `document.modelContext.registerTool()` and registers six focused tools:
 
-1. `tunein_join_room`
-2. `tunein_get_room_state`
+1. `tunein_join_session`
+2. `tunein_get_session_state`
 3. `tunein_listen`
-4. `tunein_perform_phrase`
-5. `tunein_set_compass`
+4. `tunein_wait_for_human_phrase`
+5. `tunein_perform_phrase`
+6. `tunein_set_compass`
 
 Each tool has a descriptive JSON Schema and security-relevant annotations. Read tools return compact, structured musical context. Mutating tools reuse the same validated application functions as the visible interface. The performance tool supports overlapping notes, beat-relative scheduling, multiple timbres, bounded phrase length, bounded velocity, and cancellation.
 
@@ -52,7 +53,7 @@ The agent workflow is genuinely tool-driven: joining, listening, analyzing, perf
 
 ### Execution
 
-The project is a complete instrument: room lifecycle, responsive audio, visual score, event history, multiple voices, keyboard/touch access, empty and connected states, cross-tab synchronization, validation, tests, documentation, and deployment output.
+The project is a complete instrument: responsive audio, visual score, event history, multiple voices, keyboard/touch access, empty and connected states, validation, tests, documentation, and deployment output.
 
 ### Potential impact
 
@@ -70,9 +71,9 @@ The agent is not a song vending machine. It becomes a present, visible collabora
 
 Show the full board, change from piano to synth, and play three notes.
 
-### 0:18–0:40 — Create the room
+### 0:18–0:40 — Start the session
 
-Create a new room. Point out the room key, shared compass, live score, and open agent chair. Copy the provided agent prompt.
+Point out the shared compass, live score, and waiting agent seat. Copy the provided agent prompt.
 
 ### 0:40–1:05 — Human phrase
 
@@ -80,9 +81,9 @@ Play a short original phrase on piano. Pause deliberately. Show the event histor
 
 ### 1:05–1:35 — WebMCP in action
 
-Ask the agent: “Join this room, listen to my recent phrase, then answer on violin.”
+Ask the agent: “Use TuneIn’s WebMCP tools to join this session and stay for a live call-and-response jam.”
 
-Show the agent calling `tunein_join_room`, `tunein_listen`, and `tunein_perform_phrase`. Let the violin answer play. Point out the agent's named seat and violet events.
+Show the agent calling `tunein_join_session`, `tunein_listen`, and `tunein_perform_phrase`. Let the violin answer play. Point out the agent's named seat and violet events.
 
 ### 1:35–1:58 — A real duet
 
@@ -90,7 +91,7 @@ Answer the agent on piano, then ask it to listen again and add a trumpet harmony
 
 ### 1:58–2:20 — Why WebMCP
 
-“The agent does not guess where keys are or reconstruct music from pixels. WebMCP gives it the room's actual musical state and a safe, expressive way to contribute. TuneIn becomes more useful because a person and an agent are present together.”
+“The agent does not guess where keys are or reconstruct music from pixels. WebMCP gives it the session's actual musical state and a safe, expressive way to contribute. TuneIn becomes more useful because a person and an agent are present together.”
 
 End on the animated score and the line “Play a thought together.”
 

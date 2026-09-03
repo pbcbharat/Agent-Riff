@@ -4,9 +4,10 @@ import { NOTES } from "../public/core.js";
 import { createTuneInTools, registerTuneInTools } from "../public/webmcp.js";
 
 const app = {
-  joinRoom: (key) => key,
-  getRoomState: () => ({ room: "MUSE42" }),
+  joinSession: ({ actor }) => actor,
+  getSessionState: () => ({ session: "current_page" }),
   listen: () => ({ analysis: { density: "open" } }),
+  waitForHumanPhrase: async () => ({ outcome: "human_phrase" }),
   performPhrase: async () => ({ ok: true }),
   setCompass: () => ({ ok: true }),
 };
@@ -14,13 +15,15 @@ const app = {
 test("TuneIn exposes a focused WebMCP collaboration surface", () => {
   const tools = createTuneInTools(app);
   assert.deepEqual(tools.map(({ name }) => name), [
-    "tunein_join_room",
-    "tunein_get_room_state",
+    "tunein_join_session",
+    "tunein_get_session_state",
     "tunein_listen",
+    "tunein_wait_for_human_phrase",
     "tunein_perform_phrase",
     "tunein_set_compass",
   ]);
   assert.equal(tools.find(({ name }) => name === "tunein_listen").annotations.readOnlyHint, true);
+  assert.equal(tools.find(({ name }) => name === "tunein_wait_for_human_phrase").annotations.readOnlyHint, true);
   const performTool = tools.find(({ name }) => name === "tunein_perform_phrase");
   assert.equal(performTool.inputSchema.properties.steps.maxItems, 32);
   assert.deepEqual(performTool.inputSchema.properties.steps.items.properties.note.enum, NOTES);
@@ -31,7 +34,7 @@ test("TuneIn exposes a focused WebMCP collaboration surface", () => {
   assert.ok(tools.every(({ inputSchema }) => (
     Object.values(inputSchema.properties).every((property) => property.description || property.type === "array")
   )));
-  assert.equal(tools.find(({ name }) => name === "tunein_get_room_state").inputSchema.properties.event_limit.maximum, 6);
+  assert.equal(tools.find(({ name }) => name === "tunein_get_session_state").inputSchema.properties.event_limit.maximum, 6);
   assert.equal(tools.find(({ name }) => name === "tunein_listen").inputSchema.properties.event_limit.maximum, 10);
 });
 
@@ -39,8 +42,8 @@ test("tools register through document.modelContext-compatible API", async () => 
   const calls = [];
   const modelContext = { registerTool: async (tool, options) => calls.push({ tool, options }) };
   const registration = await registerTuneInTools(modelContext, app);
-  assert.equal(calls.length, 5);
-  assert.equal(registration.names.length, 5);
+  assert.equal(calls.length, 6);
+  assert.equal(registration.names.length, 6);
   assert.ok(calls.every(({ options }) => options.signal instanceof AbortSignal));
   registration.dispose();
   assert.ok(calls.every(({ options }) => options.signal.aborted));
@@ -48,19 +51,42 @@ test("tools register through document.modelContext-compatible API", async () => 
 
 test("read tools return compact serialized context", async () => {
   const tools = createTuneInTools(app);
-  const state = await tools.find(({ name }) => name === "tunein_get_room_state").execute({ event_limit: 6 });
+  const state = await tools.find(({ name }) => name === "tunein_get_session_state").execute({ event_limit: 6 });
   const listening = await tools.find(({ name }) => name === "tunein_listen").execute({ event_limit: 8 });
 
-  assert.deepEqual(JSON.parse(state), { room: "MUSE42" });
+  assert.deepEqual(JSON.parse(state), { session: "current_page" });
   assert.equal(JSON.parse(listening).analysis.density, "open");
   assert.doesNotMatch(state, /\n/);
   assert.doesNotMatch(listening, /\n/);
 });
 
-test("join tool provides the agent with a next-step recovery cue", async () => {
-  const tool = createTuneInTools(app).find(({ name }) => name === "tunein_join_room");
-  const result = JSON.parse(await tool.execute({ room_key: "MUSE42" }));
+test("join tool takes the agent seat with an optional display name", async () => {
+  const tool = createTuneInTools(app).find(({ name }) => name === "tunein_join_session");
+  const result = JSON.parse(await tool.execute({ display_name: "ChatGPT" }));
 
   assert.equal(result.ok, true);
+  assert.equal(result.session, "current_page");
+  assert.equal(result.participant, "ChatGPT");
+  assert.deepEqual(Object.keys(tool.inputSchema.properties), ["display_name"]);
   assert.match(result.message, /Listen before playing/);
+  assert.match(result.message, /tunein_wait_for_human_phrase/);
+});
+
+test("wait tool forwards bounded session controls and cancellation", async () => {
+  const signal = new AbortController().signal;
+  const calls = [];
+  const waitApp = {
+    ...app,
+    waitForHumanPhrase: async (options, receivedSignal) => {
+      calls.push({ options, receivedSignal });
+      return { ok: true, outcome: "human_phrase" };
+    },
+  };
+  const tool = createTuneInTools(waitApp).find(({ name }) => name === "tunein_wait_for_human_phrase");
+  const result = JSON.parse(await tool.execute({ timeout_seconds: 420, phrase_pause_ms: 900 }, { signal }));
+
+  assert.equal(result.outcome, "human_phrase");
+  assert.deepEqual(calls[0].options, { timeoutSeconds: 420, phrasePauseMs: 900 });
+  assert.equal(calls[0].receivedSignal, signal);
+  assert.equal(tool.inputSchema.properties.timeout_seconds.maximum, 600);
 });

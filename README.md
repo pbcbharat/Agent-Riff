@@ -2,7 +2,7 @@
 
 **Play a thought together.**
 
-TuneIn is a shared musical canvas for a person and their browser agent. The person plays a short idea on the on-screen instrument. The agent joins the same room through WebMCP, listens to structured performance context, chooses a complementary voice, and answers with a timed phrase.
+TuneIn is a shared musical canvas for a person and their browser agent. The person plays a short idea on the on-screen instrument. The agent joins the current page session through WebMCP, listens to structured performance context, chooses a complementary voice, and answers with a timed phrase.
 
 The useful part is the exchange: a human contributes taste, timing, and surprise; an agent contributes attentive recall, music-theory context, and a second pair of hands.
 
@@ -10,10 +10,10 @@ The useful part is the exchange: a human contributes taste, timing, and surprise
 
 - A playable C4–E5 board with piano, violin, trumpet, and synth voices
 - Mouse, touch, and computer-keyboard input through the Web Audio API
-- Shareable room keys and links, with live cross-tab updates in the same browser
+- One focused, local page session with no account or setup required
 - A scrolling, pitch-accurate notation view and accessible event history showing human and agent turns
 - Shared tempo, key, and scale controls
-- Five imperative WebMCP tools for joining, observing, listening, performing, and steering the room
+- Six imperative WebMCP tools for joining, observing, listening, waiting, performing, and steering the session
 - A dependency-free build with automated tests and a Cloudflare Worker-compatible output
 
 ## WebMCP tools
@@ -22,9 +22,10 @@ TuneIn registers tools with the current `document.modelContext.registerTool()` A
 
 | Tool | Purpose | Mutates state |
 | --- | --- | --- |
-| `tunein_join_room` | Join the room key the person shared | Yes |
-| `tunein_get_room_state` | Read participants, compass, instruments, and recent events | No |
+| `tunein_join_session` | Take the agent seat in the current page session | Yes |
+| `tunein_get_session_state` | Read participants, compass, instruments, and recent events | No |
 | `tunein_listen` | Analyze recent pitch center, register, density, and musical space | No |
+| `tunein_wait_for_human_phrase` | Wait for the next completed human phrase for up to ten minutes | No |
 | `tunein_perform_phrase` | Schedule a validated, timed phrase with an instrument voice | Yes |
 | `tunein_set_compass` | Change tempo, key, or scale at the person's request | Yes |
 
@@ -54,24 +55,24 @@ For Vercel, import the repository as a project. The checked-in `vercel.json` run
 
 Use ChatGPT's in-app browser, which supports WebMCP, or Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled.
 
-1. Open TuneIn and choose **New room**.
+1. Open TuneIn in a WebMCP-capable browser.
 2. Play a short phrase with the on-screen keys or the `A`–`;` keyboard row.
-3. Give your agent the page URL and room key.
-4. Ask: “Join this room, listen to my recent phrase, then answer on violin.”
-5. Keep playing. The agent can listen again and respond to the new musical context.
+3. Copy the suggested agent prompt.
+4. Ask your agent to use TuneIn’s WebMCP tools to join the current session and stay for a live call-and-response jam.
+5. Keep playing. After each answer, the agent can wait on the page for the next phrase without another chat message.
 
 For development in a browser without native WebMCP, the same tool definitions are exposed read-only at `window.__TUNEIN_TOOLS__` for manual inspection. The app does not install a fake `document.modelContext` implementation.
 
 ## Architecture
 
-- `public/app.js` owns interface state, audio synthesis, room events, and cross-tab synchronization.
+- `public/app.js` owns the local session state, audio synthesis, and performance events.
 - `public/core.js` contains deterministic music and validation functions.
 - `public/webmcp.js` defines and registers the WebMCP tool contracts.
 - `scripts/build.mjs` creates a self-contained Worker deployment without third-party build tooling.
-- `test/` verifies room keys, music analysis, phrase constraints, tool schemas, and registration cleanup.
+- `test/` verifies music analysis, phrase constraints, tool schemas, and registration cleanup.
 - `docs/WEBMCP_EVALS.md` defines agent-journey evals for call selection, ordering, grounding, and recovery.
 
-Room history is intentionally local-first in this hackathon build. `BroadcastChannel` synchronizes tabs in the same browser profile, which matches the primary WebMCP flow: a person and their browser agent share the live page and session. Rooms do not synchronize across unrelated browsers or devices; a durable multi-device relay is the natural next step.
+The session is intentionally local to the current page and browser. TuneIn does not imply remote multiplayer or cross-browser synchronization; the browser agent collaborates through the WebMCP tools exposed by the page the person is using.
 
 ## Public-repository safety
 

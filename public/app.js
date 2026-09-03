@@ -2,11 +2,8 @@ import {
   INSTRUMENTS,
   NOTES,
   analyzePerformance,
-  createRoomCode,
   eventSummary,
   groupPerformanceEvents,
-  isValidRoomCode,
-  normalizeRoomCode,
   notationForDuration,
   noteToFrequency,
   noteToMidi,
@@ -41,20 +38,20 @@ const whiteBindings = ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";"];
 const blackBindings = ["w", "e", "t", "y", "u", "o", "p"];
 
 const state = {
-  room: null,
   instrument: "piano",
   bpm: 96,
   key: "C",
   scale: "major",
   agentName: null,
   events: [],
-  channel: null,
   metronomeTimer: null,
   audio: null,
   agentPlaying: new Map(),
+  waitCursor: null,
 };
 
 const activeVoices = new Map();
+const sessionEventListeners = new Set();
 let toastTimer;
 let humanTrackTimer;
 
@@ -353,7 +350,7 @@ function renderAgentPanel() {
     $("#agent-performance-heading").textContent = lastPhrase.label || "Phrase complete";
     $("#agent-action").textContent = lastNote ? `Last played ${lastNote.note}` : "Preparing to play";
   } else {
-    $("#agent-performance-heading").textContent = "Waiting for a phrase";
+    $("#agent-performance-heading").textContent = "";
     $("#agent-action").textContent = state.agentName ? "Listening" : "Waiting to join";
   }
 
@@ -397,42 +394,32 @@ function escapeHtml(value) {
   })[character]);
 }
 
-function storageKey() {
-  return state.room ? `tunein:room:${state.room}` : null;
-}
+const SESSION_STORAGE_KEY = "tunein:session";
 
-function saveRoom() {
-  const key = storageKey();
-  if (!key) return;
+function saveSession() {
   try {
-    localStorage.setItem(key, JSON.stringify({
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
       bpm: state.bpm,
       key: state.key,
       scale: state.scale,
-      agentName: state.agentName,
       events: state.events.slice(-64),
     }));
   } catch {
-    // The room remains usable when storage is unavailable.
+    // The session remains usable when storage is unavailable.
   }
 }
 
-function loadRoom(room) {
+function loadSession() {
   try {
-    const saved = JSON.parse(localStorage.getItem(`tunein:room:${room}`));
+    const saved = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY));
     if (!saved) return;
     state.bpm = Number(saved.bpm) || state.bpm;
     state.key = saved.key || state.key;
     state.scale = saved.scale || state.scale;
-    state.agentName = saved.agentName || null;
     state.events = Array.isArray(saved.events) ? withStableTurnIds(saved.events.slice(-64)) : [];
   } catch {
     state.events = [];
   }
-}
-
-function broadcast(message) {
-  state.channel?.postMessage({ ...message, sender: window.name || crypto.randomUUID() });
 }
 
 function withStableTurnIds(events) {
@@ -450,7 +437,11 @@ function withStableTurnIds(events) {
   });
 }
 
-function recordEvent(event, shouldBroadcast = true) {
+function notifySessionEvent(event) {
+  sessionEventListeners.forEach((listener) => listener(event));
+}
+
+function recordEvent(event) {
   let completeEvent = {
     id: event.id || crypto.randomUUID(),
     timestamp: event.timestamp || Date.now(),
@@ -471,21 +462,19 @@ function recordEvent(event, shouldBroadcast = true) {
   }
   if (state.events.some((existing) => existing.id === completeEvent.id)) return completeEvent;
   state.events = [...state.events.slice(-63), completeEvent];
+  notifySessionEvent(completeEvent);
   if (completeEvent.type === "note") visualNote(completeEvent);
   renderActivity();
-  saveRoom();
-  if (shouldBroadcast) broadcast({ type: "event", event: completeEvent });
+  saveSession();
   return completeEvent;
 }
 
 function updateAgentSeat() {
   const joined = Boolean(state.agentName);
-  $("#agent-name").textContent = joined ? state.agentName : "Open chair";
+  $("#agent-name").textContent = joined ? state.agentName : "Waiting for agent";
   $("#agent-message").textContent = joined
-    ? `${state.agentName} can hear the room state and perform through WebMCP.`
-    : "Create a room, then share its key with your browser agent.";
-  $("#agent-status").textContent = joined ? "Tuned in" : "Waiting";
-  $("#agent-status").classList.toggle("joined", joined);
+    ? `${state.agentName} can hear this session and perform through WebMCP.`
+    : "Ask your browser agent to use TuneIn’s WebMCP tools.";
   renderAgentPanel();
 }
 
@@ -499,72 +488,12 @@ function updateCompassUI() {
   $("#tempo").setAttribute("aria-valuetext", `${state.bpm} beats per minute`);
 }
 
-function connectRoomChannel(room) {
-  state.channel?.close();
-  if (!("BroadcastChannel" in window)) return;
-  state.channel = new BroadcastChannel(`tunein-room-${room}`);
-  state.channel.addEventListener("message", ({ data }) => {
-    if (data?.type === "event" && data.event) {
-      recordEvent(data.event, false);
-      if (data.event.type === "note") {
-        makeVoice(data.event.note, data.event.instrument, data.event.velocity, data.event.duration);
-        if (data.event.role === "agent") showAgentNote(data.event.note, data.event.instrument, data.event.duration);
-      }
-      if (data.event.type === "settings" && data.event.settings) {
-        Object.assign(state, data.event.settings);
-        updateCompassUI();
-        saveRoom();
-      }
-      if (data.event.type === "presence" && data.event.role === "agent") {
-        state.agentName = data.event.actor;
-        updateAgentSeat();
-      }
-    } else if (data?.type === "clear") {
-      state.events = [];
-      state.agentPlaying.clear();
-      saveRoom();
-      $("#note-field").replaceChildren();
-      $("#score-empty").classList.remove("hidden");
-      renderActivity();
-    }
-  });
-}
-
-function joinRoom(rawRoom, { actor = "You", role = "human", announce = true } = {}) {
-  const room = normalizeRoomCode(rawRoom);
-  if (!isValidRoomCode(room)) throw new Error("Room keys contain 4–8 letters or numbers.");
-
-  const changedRoom = state.room !== room;
-  state.room = room;
-  if (changedRoom) {
-    state.events = [];
-    loadRoom(room);
-    connectRoomChannel(room);
-  }
-
-  if (role === "agent") state.agentName = String(actor).slice(0, 32);
-  const url = new URL(window.location.href);
-  url.searchParams.set("room", room);
-  history.replaceState({}, "", url);
-  $("#room-code").textContent = room;
-  $("#room-state").textContent = "Room open · shared in this browser";
-  $("#copy-room").disabled = false;
-  $("#join-code").value = "";
-  $("#prompt-room").textContent = room;
-  updateCompassUI();
+function joinSession({ actor = "AI collaborator" } = {}) {
+  const participant = String(actor || "AI collaborator").slice(0, 32);
+  state.agentName = participant;
   updateAgentSeat();
-  renderActivity();
-
-  if (announce) recordEvent({ type: "presence", actor, role });
-  return room;
-}
-
-function createRoom() {
-  const room = createRoomCode();
-  joinRoom(room, { announce: false });
-  state.events = [];
-  recordEvent({ type: "presence", actor: "You", role: "human" });
-  showToast(`Room ${room} is ready`);
+  recordEvent({ type: "presence", actor: participant, role: "agent" });
+  return participant;
 }
 
 function setInstrumentMenuOpen(open) {
@@ -610,7 +539,7 @@ function playHumanNote(note, inputKey) {
     duration: null,
     durationBeats: null,
     velocity: 0.72,
-  }, false);
+  });
   setHumanTrackLive(true);
 }
 
@@ -641,10 +570,10 @@ function stopHumanNote(note, inputKey) {
   };
   if (eventIndex >= 0) state.events = state.events.with(eventIndex, completeEvent);
   else state.events = [...state.events.slice(-63), completeEvent];
+  notifySessionEvent(completeEvent);
   visualNote(completeEvent);
   renderActivity();
-  saveRoom();
-  broadcast({ type: "event", event: completeEvent });
+  saveSession();
   if (!activeVoices.size) setHumanTrackLive(false);
 }
 
@@ -685,15 +614,15 @@ function setCompass(input = {}, actor = "You") {
   }
   const detail = Object.entries(updates).map(([key, value]) => `${key} to ${value}`).join(", ") || "no settings";
   recordEvent({ type: "settings", actor, role: actor === "You" ? "human" : "agent", detail, settings: updates });
-  return { ok: true, room: state.room || "SOLO", compass: { bpm: state.bpm, key: state.key, scale: state.scale } };
+  return { ok: true, session: "current_page", compass: { bpm: state.bpm, key: state.key, scale: state.scale } };
 }
 
-function roomState(eventLimit = 16) {
+function sessionState(eventLimit = 16) {
   const recentEvents = state.events.slice(-Math.max(1, Math.min(6, eventLimit)));
   const firstTimestamp = recentEvents[0]?.timestamp || Date.now();
   return {
-    room: state.room || "SOLO",
-    status: state.room ? "open" : "private_rehearsal",
+    session: "current_page",
+    status: "active",
     compass: { bpm: state.bpm, key: state.key, scale: state.scale },
     availableInstruments: INSTRUMENTS,
     participants: ["Human", ...(state.agentName ? [state.agentName] : [])],
@@ -714,7 +643,7 @@ function listen(eventLimit = 16) {
   const recent = state.events.filter((event) => event.type === "note").slice(-Math.max(3, Math.min(10, eventLimit)));
   const firstTimestamp = recent[0]?.timestamp || Date.now();
   return {
-    room: state.room || "SOLO",
+    session: "current_page",
     compass: { bpm: state.bpm, key: state.key, scale: state.scale },
     analysis: analyzePerformance(recent, state),
     notesHeard: recent.map((event) => ({
@@ -728,14 +657,124 @@ function listen(eventLimit = 16) {
   };
 }
 
-async function performPhrase(input, signal) {
-  if (!state.room) throw new Error("Join a room before performing a phrase.");
-  const phrase = validatePhrase(input);
-  const actor = state.agentName || "AI collaborator";
-  if (!state.agentName) {
-    state.agentName = actor;
-    updateAgentSeat();
+function isCompletedHumanNote(event) {
+  return event?.type === "note"
+    && event.role !== "agent"
+    && Number.isFinite(Number(event.durationBeats))
+    && Number(event.durationBeats) > 0;
+}
+
+function humanNotesAfterCursor(cursor) {
+  const completed = state.events.filter(isCompletedHumanNote);
+  if (!cursor?.eventId) return completed.filter((event) => event.timestamp > (cursor?.timestamp || 0));
+  const cursorIndex = completed.findIndex((event) => event.id === cursor.eventId);
+  return cursorIndex >= 0
+    ? completed.slice(cursorIndex + 1)
+    : completed.filter((event) => event.timestamp > (cursor.timestamp || 0));
+}
+
+function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 1200 } = {}, signal) {
+  if (!state.agentName) throw new Error("Join the session before waiting for a human phrase.");
+
+  const boundedTimeoutSeconds = Math.max(15, Math.min(600, Math.round(Number(timeoutSeconds) || 600)));
+  const boundedPhrasePauseMs = Math.max(500, Math.min(3000, Math.round(Number(phrasePauseMs) || 1200)));
+  const startedAt = Date.now();
+
+  if (!state.waitCursor) {
+    const latestCompletedNote = state.events.filter(isCompletedHumanNote).at(-1);
+    state.waitCursor = {
+      eventId: latestCompletedNote?.id || null,
+      timestamp: latestCompletedNote?.timestamp || startedAt,
+    };
   }
+
+  return new Promise((resolve, reject) => {
+    const phraseNotes = new Map();
+    let phraseTimer = null;
+    let timeoutTimer = null;
+    let settled = false;
+
+    const cleanup = () => {
+      clearTimeout(phraseTimer);
+      clearTimeout(timeoutTimer);
+      sessionEventListeners.delete(onSessionEvent);
+      signal?.removeEventListener("abort", onAbort);
+    };
+
+    const finish = (outcome) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      const notes = [...phraseNotes.values()].sort((a, b) => a.timestamp - b.timestamp);
+      if (outcome === "human_phrase" && notes.length) {
+        const lastNote = notes.at(-1);
+        state.waitCursor = { eventId: lastNote.id, timestamp: lastNote.timestamp };
+        const firstTimestamp = notes[0].timestamp;
+        resolve({
+          ok: true,
+          outcome,
+          session: "current_page",
+          waitedSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
+          phrase: {
+            noteCount: notes.length,
+            notes: notes.map((event) => ({
+              note: event.note,
+              instrument: event.instrument,
+              beatOffset: Number((((event.timestamp - firstTimestamp) * state.bpm) / 60000).toFixed(2)),
+              durationBeats: Number(Number(event.durationBeats).toFixed(2)),
+            })),
+          },
+          nextAction: "Call tunein_listen, perform one compatible reply, then call tunein_wait_for_human_phrase again to continue the live jam.",
+        });
+        return;
+      }
+      resolve({
+        ok: true,
+        outcome: "timeout",
+        session: "current_page",
+        waitedSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
+        message: "No new human phrase arrived before the bounded wait ended. Finish the jam unless the user asks to continue.",
+      });
+    };
+
+    const schedulePhraseEnd = () => {
+      clearTimeout(phraseTimer);
+      phraseTimer = setTimeout(() => finish("human_phrase"), boundedPhrasePauseMs);
+    };
+
+    const collectNewNotes = () => {
+      humanNotesAfterCursor(state.waitCursor).forEach((event) => phraseNotes.set(event.id, event));
+      if (phraseNotes.size) schedulePhraseEnd();
+    };
+
+    function onSessionEvent(event) {
+      if (!isCompletedHumanNote(event)) return;
+      collectNewNotes();
+    }
+
+    function onAbort() {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new DOMException("Waiting for the human phrase was cancelled.", "AbortError"));
+    }
+
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+
+    sessionEventListeners.add(onSessionEvent);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    timeoutTimer = setTimeout(() => finish("timeout"), boundedTimeoutSeconds * 1000);
+    collectNewNotes();
+  });
+}
+
+async function performPhrase(input, signal) {
+  if (!state.agentName) throw new Error("Join the session before performing a phrase.");
+  const phrase = validatePhrase(input);
+  const actor = state.agentName;
 
   const phraseStartedAt = Date.now();
   recordEvent({ type: "phrase", actor, role: "agent", instrument: phrase.instrument, label: phrase.label, timestamp: phraseStartedAt });
@@ -771,12 +810,12 @@ async function performPhrase(input, signal) {
   const endingBeat = Math.max(...phrase.steps.map((step) => step.beat + step.durationBeats));
   return {
     ok: true,
-    room: state.room,
+    session: "current_page",
     performer: actor,
     instrument: phrase.instrument,
     scheduledNotes: phrase.steps.length,
     durationSeconds: Number((endingBeat * secondsPerBeat).toFixed(2)),
-    message: `Scheduled “${phrase.label}”. Listen again after the human responds.`,
+    message: `Scheduled “${phrase.label}”. For a live jam, call tunein_wait_for_human_phrase now; it will return after the human plays and pauses.`,
   };
 }
 
@@ -833,25 +872,8 @@ function toggleMetronome() {
 }
 
 function bindUI() {
-  $("#new-room").addEventListener("click", createRoom);
-  $("#join-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    try {
-      joinRoom(new FormData(event.currentTarget).get("room"));
-      showToast("You’re in the room");
-    } catch (error) {
-      showToast(error.message);
-      $("#join-code").focus();
-    }
-  });
-  $("#join-code").addEventListener("input", (event) => { event.target.value = normalizeRoomCode(event.target.value); });
-  $("#copy-room").addEventListener("click", async () => {
-    await navigator.clipboard.writeText(window.location.href);
-    showToast("Room link copied");
-  });
   $("#copy-prompt").addEventListener("click", async () => {
-    const room = state.room || "the room on this page";
-    const prompt = `Open ${window.location.href}, join room ${room}, listen to my recent phrase, and answer with a short compatible phrase on violin.`;
+    const prompt = `Use the current TuneIn page at ${window.location.href}. Inspect and use the WebMCP site tools provided by the page instead of visual browser automation. Call tunein_join_session, then stay for a live call-and-response jam. Listen and answer my phrases, and call tunein_wait_for_human_phrase after each reply so I do not need to prompt you again. Wait for up to 10 minutes between turns.`;
     await navigator.clipboard.writeText(prompt);
     showToast("Agent prompt copied");
   });
@@ -903,12 +925,12 @@ function bindUI() {
   $("#clear").addEventListener("click", () => {
     state.events = [];
     state.agentPlaying.clear();
-    saveRoom();
+    state.waitCursor = null;
+    saveSession();
     $("#note-field").replaceChildren();
     $("#score-empty").classList.remove("hidden");
     renderActivity();
-    broadcast({ type: "clear" });
-    showToast("Notes and activity cleared · room settings kept");
+    showToast("Notes and activity cleared · musical settings kept");
   });
   $("#play-starter").addEventListener("click", playStarterMotif);
 
@@ -957,20 +979,19 @@ async function initializeWebMCP() {
 }
 
 const appAdapter = {
-  joinRoom,
-  getRoomState: roomState,
+  joinSession,
+  getSessionState: sessionState,
   listen,
+  waitForHumanPhrase,
   performPhrase,
   setCompass,
 };
 
+loadSession();
 buildKeyboard();
 bindUI();
 updateCompassUI();
 updateAgentSeat();
 renderActivity();
-
-const roomFromUrl = normalizeRoomCode(new URL(window.location.href).searchParams.get("room") || "");
-if (isValidRoomCode(roomFromUrl)) joinRoom(roomFromUrl, { announce: false });
 
 initializeWebMCP();

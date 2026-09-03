@@ -13,8 +13,8 @@ Please do not open a public issue for a vulnerability that could put users at ri
 - the impact you observed; and
 - a suggested mitigation, if you have one.
 
-Please do not include real credentials, private room data, or personal information in a report.
+Please do not include real credentials, private performance data, or personal information in a report.
 
 ## Security model
 
-TuneIn is local-first and does not collect accounts or personal data. WebMCP tools expose only the current room's musical state. State-changing tools use bounded schemas and runtime validation. The app does not request microphone, camera, location, or file permissions.
+TuneIn is local-first and does not collect accounts or personal data. WebMCP tools expose only the current page session's musical state. State-changing tools use bounded schemas and runtime validation. The app does not request microphone, camera, location, or file permissions.

@@ -21,10 +21,10 @@ test("production worker serves the app shell and static modules", async () => {
   assert.match(await script.text(), /tunein_perform_phrase/);
 });
 
-test("production worker falls back to the app shell for share links", async () => {
-  const response = await worker.fetch(new Request("https://tunein.example/room/MUSE42"));
+test("production worker falls back to the app shell for navigation paths", async () => {
+  const response = await worker.fetch(new Request("https://tunein.example/play"));
   assert.equal(response.status, 200);
-  assert.match(await response.text(), /id="room-code"/);
+  assert.match(await response.text(), /id="instrument"/);
 });
 
 test("Vercel publishes the static client artifact with hardened response headers", async () => {

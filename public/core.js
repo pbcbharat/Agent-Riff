@@ -18,23 +18,6 @@ const SCALE_INTERVALS = {
   pentatonic: [0, 2, 4, 7, 9],
 };
 
-export function normalizeRoomCode(value = "") {
-  return String(value).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-}
-
-export function isValidRoomCode(value) {
-  return /^[A-Z0-9]{4,8}$/.test(normalizeRoomCode(value));
-}
-
-export function createRoomCode(random = Math.random) {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let index = 0; index < 6; index += 1) {
-    code += alphabet[Math.floor(random() * alphabet.length) % alphabet.length];
-  }
-  return code;
-}
-
 export function isValidNote(note) {
   return /^[A-G](?:#|b)?[2-6]$/.test(String(note));
 }
@@ -182,8 +165,8 @@ export function groupPerformanceEvents(events = []) {
 
 export function eventSummary(event) {
   if (event.type === "note") return `${event.note} on ${event.instrument}`;
-  if (event.type === "presence") return `${event.actor} joined the room`;
+  if (event.type === "presence") return `${event.actor} joined the session`;
   if (event.type === "settings") return `${event.actor} set ${event.detail}`;
   if (event.type === "phrase") return `${event.actor} began “${event.label}”`;
-  return event.detail || "Room updated";
+  return event.detail || "Session updated";
 }

@@ -2,28 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   analyzePerformance,
-  createRoomCode,
   groupPerformanceEvents,
   isValidNote,
-  isValidRoomCode,
   notationForDuration,
-  normalizeRoomCode,
   noteToFrequency,
   noteToStaffStep,
   scaleNotes,
   validatePhrase,
 } from "../public/core.js";
-
-test("room keys are normalized and validated", () => {
-  assert.equal(normalizeRoomCode(" tune-in! "), "TUNEIN");
-  assert.equal(isValidRoomCode("A7MUSE"), true);
-  assert.equal(isValidRoomCode("no"), false);
-});
-
-test("room generation uses an unambiguous alphabet", () => {
-  assert.equal(createRoomCode(() => 0), "AAAAAA");
-  assert.equal(createRoomCode(() => 0.999), "999999");
-});
 
 test("scientific notes map to useful frequencies", () => {
   assert.equal(isValidNote("C#4"), true);
@@ -78,7 +64,7 @@ test("scales are returned inside the requested key", () => {
   assert.deepEqual(scaleNotes("A", "pentatonic", 4), ["A4", "B4", "C#5", "E5", "F#5"]);
 });
 
-test("performance analysis turns room notes into a compact listening brief", () => {
+test("performance analysis turns session notes into a compact listening brief", () => {
   const events = ["C4", "E4", "G4", "C4"].map((note) => ({ type: "note", note }));
   const result = analyzePerformance(events, { key: "C", scale: "major", bpm: 96 });
   assert.equal(result.noteCount, 4);
