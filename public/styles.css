@@ -819,12 +819,51 @@ kbd {
 .text-button:hover { color: #ddff8c; }
 
 .agent-seat {
+  position: relative;
   display: grid;
   grid-template-columns: 41px 1fr;
   gap: 12px;
   padding: 18px 18px 15px;
   border-bottom: 1px solid var(--line);
 }
+
+.agent-release {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0 0 2px;
+  color: #ff8176;
+  border: 1px solid rgba(255, 105, 95, 0.3);
+  border-radius: 7px;
+  background: rgba(255, 92, 82, 0.06);
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.78;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease, opacity 150ms ease, transform 150ms ease;
+}
+
+.agent-release[hidden] { display: none; }
+
+.agent-release:hover,
+.agent-release:focus-visible {
+  color: #fff;
+  border-color: rgba(255, 105, 95, 0.78);
+  background: rgba(255, 82, 72, 0.72);
+  opacity: 1;
+}
+
+.agent-release:focus-visible {
+  outline: 2px solid rgba(255, 129, 118, 0.48);
+  outline-offset: 2px;
+}
+
+.agent-release:active { transform: scale(0.94); }
 
 .agent-orbit {
   position: relative;

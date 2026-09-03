@@ -14,6 +14,7 @@ test("production worker serves the app shell and static modules", async () => {
   assert.match(pageHtml, /Play the first phrase/);
   assert.match(pageHtml, /class="workspace-shell"/);
   assert.match(pageHtml, /Agent performance/);
+  assert.match(pageHtml, /id="release-agent"/);
   assert.match(pageHtml, /id="instrument-trigger"/);
   assert.match(pageHtml, /id="instrument-options"/);
   assert.doesNotMatch(pageHtml, /id="instrument-select"/);

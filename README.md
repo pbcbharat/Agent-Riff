@@ -13,6 +13,7 @@ The useful part is the exchange: a human contributes taste, timing, and surprise
 - One focused, local page session with no account or setup required
 - A scrolling, pitch-accurate notation view and accessible event history showing human and agent turns
 - Clickable turn cards that replay stored human or agent phrases, including simultaneous overlapping replays
+- A visible release control that ends an active agent wait and cancels queued agent playback
 - Shared tempo, key, and scale controls
 - Seven imperative WebMCP tools for joining, observing, listening, waiting, performing, batching songs, and steering the session
 - A dependency-free build with automated tests and a Cloudflare Worker-compatible output

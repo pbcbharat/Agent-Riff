@@ -54,6 +54,9 @@ const state = {
 
 const activeVoices = new Map();
 const sessionEventListeners = new Set();
+const agentReleaseListeners = new Set();
+const agentPerformanceTimers = new Set();
+const activeAgentVoices = new Set();
 let toastTimer;
 let humanTrackTimer;
 
@@ -126,6 +129,29 @@ function makeVoice(note, instrument, velocity = 0.7, duration = null) {
 
   if (duration) setTimeout(() => stop(), duration * 1000);
   return { stop };
+}
+
+function scheduleAgentTimer(callback, delayMs) {
+  const timer = setTimeout(() => {
+    agentPerformanceTimers.delete(timer);
+    callback();
+  }, delayMs);
+  agentPerformanceTimers.add(timer);
+  return timer;
+}
+
+function clearAgentTimers(timers = agentPerformanceTimers) {
+  timers.forEach((timer) => {
+    clearTimeout(timer);
+    agentPerformanceTimers.delete(timer);
+  });
+}
+
+function makeAgentVoice(note, instrument, velocity, duration) {
+  const voice = makeVoice(note, instrument, velocity, duration);
+  activeAgentVoices.add(voice);
+  setTimeout(() => activeAgentVoices.delete(voice), Math.max(120, duration * 1000 + 500));
+  return voice;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -521,6 +547,7 @@ function updateAgentSeat() {
   $("#agent-message").textContent = joined
     ? `${state.agentName} can hear this session and perform through WebMCP.`
     : "Ask your browser agent to use TuneIn’s WebMCP tools.";
+  $("#release-agent").hidden = !joined;
   renderAgentPanel();
 }
 
@@ -540,6 +567,21 @@ function joinSession({ actor = "AI collaborator" } = {}) {
   updateAgentSeat();
   recordEvent({ type: "presence", actor: participant, role: "agent" });
   return participant;
+}
+
+function releaseAgent() {
+  const participant = state.agentName;
+  if (!participant) return;
+
+  clearAgentTimers();
+  activeAgentVoices.forEach((voice) => voice.stop());
+  activeAgentVoices.clear();
+  state.agentPlaying.clear();
+  state.agentName = null;
+  state.waitCursor = null;
+  agentReleaseListeners.forEach((listener) => listener());
+  updateAgentSeat();
+  showToast(`${participant} released`);
 }
 
 function setInstrumentMenuOpen(open) {
@@ -745,6 +787,7 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
       clearTimeout(phraseTimer);
       clearTimeout(timeoutTimer);
       sessionEventListeners.delete(onSessionEvent);
+      agentReleaseListeners.delete(onRelease);
       signal?.removeEventListener("abort", onAbort);
     };
 
@@ -752,6 +795,17 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
       if (settled) return;
       settled = true;
       cleanup();
+      if (outcome === "released") {
+        resolve({
+          ok: true,
+          outcome,
+          session: "current_page",
+          waitedSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
+          message: "The human released your TuneIn agent seat. End this task now and do not rejoin or call another TuneIn tool unless the human explicitly asks you to start a new jam.",
+          nextAction: "Finish the task now.",
+        });
+        return;
+      }
       const notes = [...phraseNotes.values()].sort((a, b) => a.timestamp - b.timestamp);
       if (outcome === "human_phrase" && notes.length) {
         const lastNote = notes.at(-1);
@@ -809,12 +863,17 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
       reject(new DOMException("Waiting for the human phrase was cancelled.", "AbortError"));
     }
 
+    function onRelease() {
+      finish("released");
+    }
+
     if (signal?.aborted) {
       onAbort();
       return;
     }
 
     sessionEventListeners.add(onSessionEvent);
+    agentReleaseListeners.add(onRelease);
     signal?.addEventListener("abort", onAbort, { once: true });
     timeoutTimer = setTimeout(() => finish("timeout"), boundedTimeoutSeconds * 1000);
     collectNewNotes();
@@ -839,10 +898,10 @@ async function performPhrase(input, signal) {
   const timers = [];
 
   for (const step of phrase.steps) {
-    const timer = setTimeout(() => {
-      if (signal?.aborted) return;
+    const timer = scheduleAgentTimer(() => {
+      if (signal?.aborted || state.agentName !== actor) return;
       const duration = step.durationBeats * secondsPerBeat;
-      makeVoice(step.note, phrase.instrument, phrase.velocity, duration);
+      makeAgentVoice(step.note, phrase.instrument, phrase.velocity, duration);
       showAgentNote(step.note, phrase.instrument, duration);
       $$(`[data-note="${step.note}"]`).forEach((key) => {
         key.classList.add("active");
@@ -864,7 +923,7 @@ async function performPhrase(input, signal) {
     timers.push(timer);
   }
 
-  signal?.addEventListener("abort", () => timers.forEach(clearTimeout), { once: true });
+  signal?.addEventListener("abort", () => clearAgentTimers(timers), { once: true });
   const endingBeat = Math.max(...phrase.steps.map((step) => step.beat + step.durationBeats));
   const durationSeconds = Number((endingBeat * secondsPerBeat).toFixed(2));
   return {
@@ -900,8 +959,8 @@ async function performSet(input, signal) {
     const secondsPerBeat = 60 / song.bpm;
     const durationSeconds = song.totalBeats * secondsPerBeat;
 
-    timers.push(setTimeout(() => {
-      if (signal?.aborted) return;
+    timers.push(scheduleAgentTimer(() => {
+      if (signal?.aborted || state.agentName !== actor) return;
       setCompass({ bpm: song.bpm, key: song.key, scale: song.scale }, actor);
       recordEvent({
         id: turnId,
@@ -916,10 +975,10 @@ async function performSet(input, signal) {
     }, songStartSeconds * 1000));
 
     song.steps.forEach((step) => {
-      timers.push(setTimeout(() => {
-        if (signal?.aborted) return;
+      timers.push(scheduleAgentTimer(() => {
+        if (signal?.aborted || state.agentName !== actor) return;
         const duration = step.durationBeats * secondsPerBeat;
-        makeVoice(step.note, song.instrument, song.velocity, duration);
+        makeAgentVoice(step.note, song.instrument, song.velocity, duration);
         showAgentNote(step.note, song.instrument, duration);
         $$(`[data-note="${step.note}"]`).forEach((key) => {
           key.classList.add("active");
@@ -954,7 +1013,7 @@ async function performSet(input, signal) {
     if (songIndex < performance.songs.length - 1) cursorSeconds += song.gapBeats * secondsPerBeat;
   });
 
-  signal?.addEventListener("abort", () => timers.forEach(clearTimeout), { once: true });
+  signal?.addEventListener("abort", () => clearAgentTimers(timers), { once: true });
   const durationSeconds = Number(cursorSeconds.toFixed(2));
   return {
     ok: true,
@@ -1073,6 +1132,7 @@ function bindUI() {
   $("#key-select").addEventListener("change", (event) => setCompass({ key: event.target.value }));
   $("#scale-select").addEventListener("change", (event) => setCompass({ scale: event.target.value }));
   $("#metronome").addEventListener("click", toggleMetronome);
+  $("#release-agent").addEventListener("click", releaseAgent);
   $("#clear").addEventListener("click", () => {
     state.events = [];
     state.agentPlaying.clear();
