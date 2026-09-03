@@ -124,6 +124,31 @@ export function scaleNotes(key = "C", scale = "major", octave = 4) {
   });
 }
 
+function replyPlanFor(noteCount, density) {
+  if (!noteCount) {
+    return {
+      targetNotes: 14,
+      targetBeats: 8,
+      shape: "state a motif → vary it → resolve",
+    };
+  }
+
+  if (density === "busy") {
+    return {
+      targetNotes: 10,
+      targetBeats: 8,
+      shape: "quote 2–3 notes → leave space → resolve with held tones",
+    };
+  }
+
+  const targetNotes = Math.min(18, Math.max(12, Math.round(noteCount * 1.5)));
+  return {
+    targetNotes,
+    targetBeats: Math.min(10, Math.max(6, Math.round(targetNotes * 0.6))),
+    shape: "echo 3–4 notes → vary rhythm or contour → resolve",
+  };
+}
+
 export function analyzePerformance(events = [], fallback = { key: "C", scale: "major", bpm: 96 }) {
   const notes = events.filter((event) => event.type === "note" && isValidNote(event.note)).slice(-32);
   if (!notes.length) {
@@ -133,6 +158,7 @@ export function analyzePerformance(events = [], fallback = { key: "C", scale: "m
       register: "mid",
       density: "open",
       suggestion: `Begin with notes from ${fallback.key} ${fallback.scale} at ${fallback.bpm} BPM.`,
+      replyPlan: replyPlanFor(0, "open"),
     };
   }
 
@@ -145,20 +171,29 @@ export function analyzePerformance(events = [], fallback = { key: "C", scale: "m
   });
   const pitchCenter = [...pitchCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
 
+  const density = notes.length < 5 ? "open" : notes.length > 16 ? "busy" : "conversational";
   return {
     noteCount: notes.length,
     pitchCenter,
     register: average < 60 ? "low" : average > 72 ? "high" : "mid",
-    density: notes.length < 5 ? "open" : notes.length > 16 ? "busy" : "conversational",
+    density,
     suggestion: notes.length > 16
-      ? "Leave space: answer with a short phrase or held harmony."
-      : `Echo ${pitchCenter}, then resolve inside ${fallback.key} ${fallback.scale}.`,
+      ? "Leave space with a shaped counterphrase or held harmony."
+      : `Echo part of the ${pitchCenter}-centered motif, vary it, then resolve inside ${fallback.key} ${fallback.scale}.`,
+    replyPlan: replyPlanFor(notes.length, density),
   };
 }
 
 export function validatePhrase(input = {}) {
   const instrument = INSTRUMENTS.includes(input.instrument) ? input.instrument : "violin";
-  const steps = Array.isArray(input.steps) ? input.steps : [];
+  const hasSteps = Array.isArray(input.steps) && input.steps.length > 0;
+  const hasScore = typeof input.score === "string" && input.score.trim().length > 0;
+
+  if (hasSteps === hasScore) {
+    throw new Error("A phrase needs either note steps or one compact score, but not both.");
+  }
+
+  const steps = hasScore ? parseCompactScore(input.score).steps : input.steps;
 
   if (!steps.length || steps.length > MAX_PHRASE_STEPS) {
     throw new Error(`A phrase needs between 1 and ${MAX_PHRASE_STEPS} note steps.`);
@@ -169,7 +204,7 @@ export function validatePhrase(input = {}) {
       throw new Error(`Step ${index + 1} is outside the shared C4–E5 instrument range.`);
     }
     const beat = Number(step.beat ?? index * 0.5);
-    const durationBeats = Number(step.duration_beats ?? 0.45);
+    const durationBeats = Number(step.duration_beats ?? step.durationBeats ?? 0.45);
     if (!Number.isFinite(beat) || beat < 0 || beat > 256) throw new Error(`Step ${index + 1} has an invalid beat.`);
     if (!Number.isFinite(durationBeats) || durationBeats < 0.1 || durationBeats > 8) {
       throw new Error(`Step ${index + 1} has an invalid duration.`);

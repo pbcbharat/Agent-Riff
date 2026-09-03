@@ -57,7 +57,7 @@ export function createTuneInTools(app) {
       name: "tunein_listen",
       title: "Listen to the human phrase",
       description:
-        "Analyze the session's recent notes for pitch center, register, density, and space. Use the analysis to plan a compatible response rather than playing randomly.",
+        "Analyze recent notes and return pitch, density, safe notes, and a concrete reply plan. Perform directly from that plan without another read call.",
       inputSchema: objectSchema({
         event_limit: {
           type: "integer",
@@ -74,7 +74,7 @@ export function createTuneInTools(app) {
       name: "tunein_wait_for_human_phrase",
       title: "Wait for the human's next phrase",
       description:
-        "Wait for the next completed human phrase instead of ending the task. The result already includes the phrase notes, musical analysis, and safe notes, so perform directly without calling tunein_listen again. After replying, call this tool again. The wait ends when the human pauses or after ten minutes.",
+        "Wait for the next completed human phrase. The result includes its notes, analysis, safe notes, and a target length and shape for a fuller reply. Perform directly without calling tunein_listen again, then call this tool again. The wait ends when the human pauses or after ten minutes.",
       inputSchema: objectSchema({
         timeout_seconds: {
           type: "integer",
@@ -100,20 +100,25 @@ export function createTuneInTools(app) {
       name: "tunein_perform_phrase",
       title: "Perform a musical phrase",
       description:
-        "Play one timed phrase as the agent. Optional tempo, key, and scale are applied in the same call. For complete songs or multi-song requests, prefer tunein_perform_set because its compact score avoids large note-by-note payloads and repeated calls.",
-      inputSchema: objectSchema(
-        {
+        "Play one timed reply. Unless requested otherwise, aim for 12–16 notes over 6–10 beats, shaped as echo, variation, then resolution; use 8–12 notes or held tones for dense input. Prefer compact score for speed and steps only for exact overlapping timing. Optional compass changes apply here. Use tunein_perform_set for songs.",
+      inputSchema: {
+        ...objectSchema({
           instrument: { type: "string", enum: ["piano", "violin", "trumpet", "synth"], description: "The agent's instrument voice." },
           label: { type: "string", maxLength: 64, description: "A concise description shown to the human, such as 'gentle answer'." },
           velocity: { type: "number", minimum: 0.15, maximum: 1, default: 0.68, description: "Phrase loudness from 0.15 to 1." },
           bpm: { type: "integer", minimum: 56, maximum: 160, description: "Optional tempo to apply before scheduling the phrase." },
           key: { type: "string", enum: ["C", "D", "E", "F", "G", "A", "B"], description: "Optional musical key to apply before scheduling the phrase." },
           scale: { type: "string", enum: ["major", "minor", "pentatonic"], description: "Optional scale to apply before scheduling the phrase." },
+          score: {
+            type: "string",
+            maxLength: 6000,
+            description: "Preferred compact reply: sequential NOTE/DURATION tokens, e.g. 'C4/0.5 E4/0.5 G4 R/0.5 G4+B4/2'. Duration defaults to one beat; R is a rest and + forms a chord.",
+          },
           steps: {
             type: "array",
             minItems: 1,
             maxItems: MAX_PHRASE_STEPS,
-            description: `One to ${MAX_PHRASE_STEPS} notes. Matching beat values create a chord.`,
+            description: `Alternative to score for exact timing: one to ${MAX_PHRASE_STEPS} notes. Matching beat values create a chord.`,
             items: objectSchema(
               {
                 note: { type: "string", enum: NOTES, description: "A pitch on the shared C4–E5 instrument, such as G4 or C#5." },
@@ -123,9 +128,9 @@ export function createTuneInTools(app) {
               ["note", "beat"],
             ),
           },
-        },
-        ["instrument", "steps"],
-      ),
+        }, ["instrument"]),
+        anyOf: [{ required: ["score"] }, { required: ["steps"] }],
+      },
       annotations: { readOnlyHint: false, untrustedContentHint: false },
       execute: async (input, context = {}) => {
         const result = await app.performPhrase(input, context.signal);

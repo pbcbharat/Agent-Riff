@@ -74,6 +74,23 @@ test("performance analysis turns session notes into a compact listening brief", 
   assert.equal(result.noteCount, 4);
   assert.equal(result.pitchCenter, "C");
   assert.equal(result.density, "open");
+  assert.deepEqual(result.replyPlan, {
+    targetNotes: 12,
+    targetBeats: 7,
+    shape: "echo 3–4 notes → vary rhythm or contour → resolve",
+  });
+
+  const conversational = analyzePerformance(
+    Array.from({ length: 10 }, (_, index) => ({ type: "note", note: index % 2 ? "E4" : "C4" })),
+    { key: "C", scale: "major", bpm: 96 },
+  );
+  assert.equal(conversational.replyPlan.targetNotes, 15);
+
+  const busy = analyzePerformance(
+    Array.from({ length: 20 }, () => ({ type: "note", note: "G4" })),
+    { key: "C", scale: "major", bpm: 96 },
+  );
+  assert.equal(busy.replyPlan.targetNotes, 10);
 });
 
 test("phrases are constrained before audio is scheduled", () => {
@@ -94,6 +111,22 @@ test("phrases are constrained before audio is scheduled", () => {
   }), /128 note steps/);
   assert.throws(() => validatePhrase({ instrument: "piano", steps: [{ note: "Z9", beat: 0 }] }));
   assert.throws(() => validatePhrase({ instrument: "piano", steps: [{ note: "C3", beat: 0 }] }), /C4–E5/);
+
+  const compact = validatePhrase({
+    instrument: "synth",
+    score: "C4/0.5 R/0.5 E4+G4/1 C5/2",
+  });
+  assert.deepEqual(compact.steps, [
+    { note: "C4", beat: 0, durationBeats: 0.5 },
+    { note: "E4", beat: 1, durationBeats: 1 },
+    { note: "G4", beat: 1, durationBeats: 1 },
+    { note: "C5", beat: 2, durationBeats: 2 },
+  ]);
+  assert.throws(() => validatePhrase({
+    instrument: "piano",
+    score: "C4 E4",
+    steps: [{ note: "G4", beat: 0 }],
+  }), /not both/);
 });
 
 test("compact scores expand rests, durations, and chords without verbose note objects", () => {

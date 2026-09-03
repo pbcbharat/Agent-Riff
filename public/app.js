@@ -643,10 +643,11 @@ function sessionState(eventLimit = 16) {
 function listen(eventLimit = 16) {
   const recent = state.events.filter((event) => event.type === "note").slice(-Math.max(3, Math.min(10, eventLimit)));
   const firstTimestamp = recent[0]?.timestamp || Date.now();
+  const analysis = analyzePerformance(recent, state);
   return {
     session: "current_page",
     compass: { bpm: state.bpm, key: state.key, scale: state.scale },
-    analysis: analyzePerformance(recent, state),
+    analysis,
     notesHeard: recent.map((event) => ({
       note: event.note,
       beatOffset: Number((((event.timestamp - firstTimestamp) * state.bpm) / 60000).toFixed(2)),
@@ -711,6 +712,7 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
         const lastNote = notes.at(-1);
         state.waitCursor = { eventId: lastNote.id, timestamp: lastNote.timestamp };
         const firstTimestamp = notes[0].timestamp;
+        const analysis = analyzePerformance(notes, state);
         resolve({
           ok: true,
           outcome,
@@ -725,9 +727,9 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
               durationBeats: Number(Number(event.durationBeats).toFixed(2)),
             })),
           },
-          analysis: analyzePerformance(notes, state),
+          analysis,
           safeNotesToTry: scaleNotes(state.key, state.scale, 4).filter((note) => NOTES.includes(note)),
-          nextAction: "Perform one compatible reply directly from this analysis; do not call tunein_listen again. Then call tunein_wait_for_human_phrase to continue the live jam.",
+          nextAction: `Perform directly from this analysis without calling tunein_listen again. Aim for about ${analysis.replyPlan.targetNotes} notes across ${analysis.replyPlan.targetBeats} beats, shaped as ${analysis.replyPlan.shape}, unless the human requested another length. Prefer compact score notation. Then call tunein_wait_for_human_phrase again.`,
         });
         return;
       }
@@ -977,7 +979,7 @@ function toggleMetronome() {
 
 function bindUI() {
   $("#copy-prompt").addEventListener("click", async () => {
-    const prompt = `Use the current TuneIn page at ${window.location.href}. Inspect and use the WebMCP site tools provided by the page instead of visual browser automation. Call tunein_join_session, then stay for a live call-and-response jam. Listen and answer my first phrase. After each reply, call tunein_wait_for_human_phrase; its result already includes the analysis needed for your next reply, so perform directly without calling tunein_listen again. Wait for up to 10 minutes between turns.`;
+    const prompt = `Use the current TuneIn page at ${window.location.href}. Inspect and use the WebMCP site tools provided by the page instead of visual browser automation. Call tunein_join_session, then stay for a live call-and-response jam. Listen and answer my first phrase. For normal replies, follow the returned reply plan and prefer compact score notation so the musical answer can develop before resolving. After each reply, call tunein_wait_for_human_phrase; its result already includes the analysis needed for your next reply, so perform directly without calling tunein_listen again. Wait for up to 10 minutes between turns.`;
     await navigator.clipboard.writeText(prompt);
     showToast("Agent prompt copied");
   });

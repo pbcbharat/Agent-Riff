@@ -28,7 +28,11 @@ test("TuneIn exposes a focused WebMCP collaboration surface", () => {
   assert.equal(tools.find(({ name }) => name === "tunein_wait_for_human_phrase").annotations.readOnlyHint, true);
   const performTool = tools.find(({ name }) => name === "tunein_perform_phrase");
   assert.equal(performTool.inputSchema.properties.steps.maxItems, 128);
+  assert.equal(performTool.inputSchema.properties.score.type, "string");
+  assert.deepEqual(performTool.inputSchema.required, ["instrument"]);
+  assert.deepEqual(performTool.inputSchema.anyOf, [{ required: ["score"] }, { required: ["steps"] }]);
   assert.deepEqual(performTool.inputSchema.properties.steps.items.properties.note.enum, NOTES);
+  assert.match(performTool.description, /12–16 notes/);
   const setTool = tools.find(({ name }) => name === "tunein_perform_set");
   assert.equal(setTool.inputSchema.properties.songs.maxItems, 8);
   assert.ok(setTool.inputSchema.properties.songs.items.properties.song.enum.includes("ode_to_joy"));

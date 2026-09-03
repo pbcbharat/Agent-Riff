@@ -26,11 +26,11 @@ TuneIn registers tools with the current `document.modelContext.registerTool()` A
 | `tunein_get_session_state` | Read participants, compass, instruments, and recent events | No |
 | `tunein_listen` | Analyze recent pitch center, register, density, and musical space | No |
 | `tunein_wait_for_human_phrase` | Wait for the next completed human phrase and return its listening analysis | No |
-| `tunein_perform_phrase` | Schedule up to 128 validated notes, optionally changing the compass in the same call | Yes |
+| `tunein_perform_phrase` | Play a compact-score or exactly timed reply, optionally changing the compass in the same call | Yes |
 | `tunein_perform_set` | Schedule up to eight catalog or compact-score songs in one call | Yes |
 | `tunein_set_compass` | Change tempo, key, or scale at the person's request | Yes |
 
-Read-only and state-changing tools are annotated accordingly. Tool inputs use bounded JSON Schemas, phrases are validated again at execution time, and cancellation signals stop notes that have not yet been scheduled. The optional public-domain catalog and compact `NOTE/DURATION` score format avoid repeated browser round trips and large note-object payloads for explicit song requests; the granular phrase tool remains the default for improvisation.
+Read-only and state-changing tools are annotated accordingly. Tool inputs use bounded JSON Schemas, phrases are validated again at execution time, and cancellation signals stop notes that have not yet been scheduled. Compact `NOTE/DURATION` scores keep fuller 12–16-note improvisations inexpensive, while explicit step objects remain available for exact overlapping timing. The public-domain catalog applies the same compact approach to complete-song requests.
 
 ## Run locally
 
