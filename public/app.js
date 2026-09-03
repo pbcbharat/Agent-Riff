@@ -13,7 +13,7 @@ import {
   validatePerformanceSet,
   validatePhrase,
 } from "./core.js";
-import { createTuneInTools } from "./webmcp.js";
+import { createAgentRiffTools } from "./webmcp.js";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -466,7 +466,7 @@ function escapeHtml(value) {
   })[character]);
 }
 
-const SESSION_STORAGE_KEY = "tunein:session";
+const SESSION_STORAGE_KEY = "agent-riff:session";
 
 function saveSession() {
   try {
@@ -546,7 +546,7 @@ function updateAgentSeat() {
   $("#agent-name").textContent = joined ? state.agentName : "Waiting for agent";
   $("#agent-message").textContent = joined
     ? `${state.agentName} can hear this session and perform through WebMCP.`
-    : "Ask your browser agent to use TuneIn’s WebMCP tools.";
+    : "Ask your browser agent to use Agent Riff’s WebMCP tools.";
   $("#release-agent").hidden = !joined;
   renderAgentPanel();
 }
@@ -801,7 +801,7 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
           outcome,
           session: "current_page",
           waitedSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
-          message: "The human released your TuneIn agent seat. End this task now and do not rejoin or call another TuneIn tool unless the human explicitly asks you to start a new jam.",
+          message: "The human released your Agent Riff seat. End this task now and do not rejoin or call another Agent Riff tool unless the human explicitly asks you to start a new jam.",
           nextAction: "Finish the task now.",
         });
         return;
@@ -828,7 +828,7 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
           },
           analysis,
           safeNotesToTry: scaleNotes(state.key, state.scale, 4).filter((note) => NOTES.includes(note)),
-          nextAction: `Perform directly from this analysis without calling tunein_listen again. Aim for about ${analysis.replyPlan.targetNotes} notes across ${analysis.replyPlan.targetBeats} beats, shaped as ${analysis.replyPlan.shape}, unless the human requested another length. Prefer compact score notation. Then call tunein_wait_for_human_phrase again.`,
+          nextAction: `Perform directly from this analysis without calling riff_listen again. Aim for about ${analysis.replyPlan.targetNotes} notes across ${analysis.replyPlan.targetBeats} beats, shaped as ${analysis.replyPlan.shape}, unless the human requested another length. Prefer compact score notation. Then call riff_wait_for_human_phrase again.`,
         });
         return;
       }
@@ -935,7 +935,7 @@ async function performPhrase(input, signal) {
     durationSeconds,
     acceptedAt: new Date(phraseStartedAt).toISOString(),
     scheduledEndAt: new Date(phraseStartedAt + durationSeconds * 1000).toISOString(),
-    message: `Scheduled “${phrase.label}”. For a live jam, call tunein_wait_for_human_phrase now; it will return after the human plays and pauses.`,
+    message: `Scheduled “${phrase.label}”. For a live jam, call riff_wait_for_human_phrase now; it will return after the human plays and pauses.`,
   };
 }
 
@@ -1083,7 +1083,7 @@ function toggleMetronome() {
 
 function bindUI() {
   $("#copy-prompt").addEventListener("click", async () => {
-    const prompt = `Use the current TuneIn page at ${window.location.href}. Inspect and use the WebMCP site tools provided by the page instead of visual browser automation. Call tunein_join_session, then stay for a live call-and-response jam. Listen and answer my first phrase. For normal replies, follow the returned reply plan and prefer compact score notation so the musical answer can develop before resolving. After each reply, call tunein_wait_for_human_phrase; its result already includes the analysis needed for your next reply, so perform directly without calling tunein_listen again. Wait for up to 10 minutes between turns.`;
+    const prompt = `Use the current Agent Riff page at ${window.location.href}. Inspect and use the WebMCP site tools provided by the page instead of visual browser automation. Call riff_join_session, then stay for a live call-and-response jam. Listen and answer my first phrase. For normal replies, follow the returned reply plan and prefer compact score notation so the musical answer can develop before resolving. After each reply, call riff_wait_for_human_phrase; its result already includes the analysis needed for your next reply, so perform directly without calling riff_listen again. Wait for up to 10 minutes between turns.`;
     await navigator.clipboard.writeText(prompt);
     showToast("Agent prompt copied");
   });
@@ -1170,7 +1170,7 @@ async function initializeWebMCP() {
   const status = $(".header-status");
   const label = $("#mcp-status");
   const modelContext = document.modelContext;
-  window.__TUNEIN_TOOLS__ = createTuneInTools(appAdapter);
+  window.__AGENT_RIFF_TOOLS__ = createAgentRiffTools(appAdapter);
 
   if (!modelContext?.registerTool) {
     label.textContent = "Human mode · WebMCP available in supported browsers";
@@ -1178,14 +1178,14 @@ async function initializeWebMCP() {
   }
 
   try {
-    const tools = createTuneInTools(appAdapter);
+    const tools = createAgentRiffTools(appAdapter);
     const controller = new AbortController();
     await Promise.all(tools.map((tool) => document.modelContext.registerTool(tool, { signal: controller.signal })));
     status.classList.add("ready");
     label.textContent = `${tools.length} WebMCP tools live`;
   } catch (error) {
     label.textContent = "WebMCP tools unavailable";
-    console.warn("TuneIn could not register its WebMCP tools.", error);
+    console.warn("Agent Riff could not register its WebMCP tools.", error);
   }
 }
 

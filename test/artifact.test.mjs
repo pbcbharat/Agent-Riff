@@ -4,13 +4,13 @@ import { readFile } from "node:fs/promises";
 import worker from "../dist/server/index.js";
 
 test("production worker serves the app shell and static modules", async () => {
-  const page = await worker.fetch(new Request("https://tunein.example/"));
-  const script = await worker.fetch(new Request("https://tunein.example/webmcp.js"));
+  const page = await worker.fetch(new Request("https://agent-riff.example/"));
+  const script = await worker.fetch(new Request("https://agent-riff.example/webmcp.js"));
 
   assert.equal(page.status, 200);
   assert.match(page.headers.get("content-type"), /text\/html/);
   const pageHtml = await page.text();
-  assert.match(pageHtml, /TuneIn — play a thought together/);
+  assert.match(pageHtml, /Agent Riff — play a thought together/);
   assert.match(pageHtml, /Play the first phrase/);
   assert.match(pageHtml, /class="workspace-shell"/);
   assert.match(pageHtml, /Agent performance/);
@@ -20,12 +20,12 @@ test("production worker serves the app shell and static modules", async () => {
   assert.doesNotMatch(pageHtml, /id="instrument-select"/);
   assert.match(script.headers.get("content-type"), /text\/javascript/);
   const toolScript = await script.text();
-  assert.match(toolScript, /tunein_perform_phrase/);
-  assert.match(toolScript, /tunein_perform_set/);
+  assert.match(toolScript, /riff_perform_phrase/);
+  assert.match(toolScript, /riff_perform_set/);
 });
 
 test("production worker falls back to the app shell for navigation paths", async () => {
-  const response = await worker.fetch(new Request("https://tunein.example/play"));
+  const response = await worker.fetch(new Request("https://agent-riff.example/play"));
   assert.equal(response.status, 200);
   assert.match(await response.text(), /id="instrument"/);
 });

@@ -1,4 +1,4 @@
-# TuneIn — WebMCP Challenge submission kit
+# Agent Riff — WebMCP Challenge submission kit
 
 ## Tagline
 
@@ -6,11 +6,11 @@ Play a thought together.
 
 ## Short description
 
-TuneIn is a live music board where a person and their browser agent improvise together. The person plays a phrase; the agent joins the current page session through structured WebMCP tools, chooses a complementary instrument, and answers in time.
+Agent Riff is a live music board where a person and their browser agent improvise together. The person plays a phrase; the agent joins the current page session through structured WebMCP tools, chooses a complementary instrument, and answers in time.
 
 ## Full project description
 
-Most music software treats AI as a generator behind a prompt box. TuneIn treats the agent as another musician in the session.
+Most music software treats AI as a generator behind a prompt box. Agent Riff treats the agent as another musician in the session.
 
 A person opens the board and plays on a responsive instrument using touch, mouse, or keyboard. Their performance becomes shared musical context: recent notes, instrument voices, tempo, key, scale, density, and pitch center. A browser agent can join the current page session with WebMCP, inspect that context, listen before acting, and perform a precisely timed answer on piano, violin, trumpet, or synth. The shared score makes every human and agent contribution visible.
 
@@ -34,15 +34,15 @@ This back-and-forth is difficult to achieve with a traditional chatbot or an age
 
 ## WebMCP implementation
 
-TuneIn uses the current imperative API at `document.modelContext.registerTool()` and registers seven focused tools:
+Agent Riff uses the current imperative API at `document.modelContext.registerTool()` and registers seven focused tools:
 
-1. `tunein_join_session`
-2. `tunein_get_session_state`
-3. `tunein_listen`
-4. `tunein_wait_for_human_phrase`
-5. `tunein_perform_phrase`
-6. `tunein_perform_set`
-7. `tunein_set_compass`
+1. `riff_join_session`
+2. `riff_get_session_state`
+3. `riff_listen`
+4. `riff_wait_for_human_phrase`
+5. `riff_perform_phrase`
+6. `riff_perform_set`
+7. `riff_set_compass`
 
 Each tool has a descriptive JSON Schema and security-relevant annotations. Read tools return compact, structured musical context. Mutating tools reuse the same validated application functions as the visible interface. The phrase tool supports overlapping notes, beat-relative scheduling, multiple timbres, bounded phrase length, bounded velocity, and cancellation. The set tool provides a compact score format and a small public-domain melody catalog so an explicit song request can be scheduled in one call instead of many model/browser round trips.
 
@@ -58,7 +58,7 @@ The project is a complete instrument: responsive audio, visual score, event hist
 
 ### Potential impact
 
-TuneIn lowers the social and technical barrier to musical collaboration. It can help a learner explore call-and-response, give a solo player an attentive practice partner, or let anyone sketch an idea with a second voice without installing music software.
+Agent Riff lowers the social and technical barrier to musical collaboration. It can help a learner explore call-and-response, give a solo player an attentive practice partner, or let anyone sketch an idea with a second voice without installing music software.
 
 ### Creativity and ambition
 
@@ -68,7 +68,7 @@ The agent is not a song vending machine. It becomes a present, visible collabora
 
 ### 0:00–0:18 — The idea
 
-“Music apps usually make you prompt an AI and wait. TuneIn puts the agent on the other side of the instrument. I play an idea; it listens and plays back.”
+“Music apps usually make you prompt an AI and wait. Agent Riff puts the agent on the other side of the instrument. I play an idea; it listens and plays back.”
 
 Show the full board, change from piano to synth, and play three notes.
 
@@ -82,17 +82,17 @@ Play a short original phrase on piano. Pause deliberately. Show the event histor
 
 ### 1:05–1:35 — WebMCP in action
 
-Ask the agent: “Use TuneIn’s WebMCP tools to join this session and stay for a live call-and-response jam.”
+Ask the agent: “Use Agent Riff’s WebMCP tools to join this session and stay for a live call-and-response jam.”
 
-Show the agent calling `tunein_join_session`, `tunein_listen`, and `tunein_perform_phrase`. Let the violin answer play. Point out the agent's named seat and violet events.
+Show the agent calling `riff_join_session`, `riff_listen`, and `riff_perform_phrase`. Let the violin answer play. Point out the agent's named seat and violet events.
 
 ### 1:35–1:58 — A real duet
 
-Answer the agent on piano, then ask it to listen again and add a trumpet harmony. Change the tempo or scale through `tunein_set_compass`.
+Answer the agent on piano, then ask it to listen again and add a trumpet harmony. Change the tempo or scale through `riff_set_compass`.
 
 ### 1:58–2:20 — Why WebMCP
 
-“The agent does not guess where keys are or reconstruct music from pixels. WebMCP gives it the session's actual musical state and a safe, expressive way to contribute. TuneIn becomes more useful because a person and an agent are present together.”
+“The agent does not guess where keys are or reconstruct music from pixels. WebMCP gives it the session's actual musical state and a safe, expressive way to contribute. Agent Riff becomes more useful because a person and an agent are present together.”
 
 End on the animated score and the line “Play a thought together.”
 

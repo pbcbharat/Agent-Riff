@@ -15,11 +15,11 @@ function asToolResult(payload) {
   return JSON.stringify(payload);
 }
 
-export function createTuneInTools(app) {
+export function createAgentRiffTools(app) {
   return [
     {
-      name: "tunein_join_session",
-      title: "Join the TuneIn session",
+      name: "riff_join_session",
+      title: "Join the Agent Riff session",
       description:
         "Take the agent seat in the live session on this page. Call this before listening or performing.",
       inputSchema: objectSchema({
@@ -32,15 +32,15 @@ export function createTuneInTools(app) {
           ok: true,
           session: "current_page",
           participant,
-          message: "Joined the current TuneIn session. Listen before playing so your response fits the human's idea. For a live jam, reply once, then call tunein_wait_for_human_phrase between turns so the human does not need to prompt you again.",
+          message: "Joined the current Agent Riff session. Listen before playing so your response fits the human's idea. For a live jam, reply once, then call riff_wait_for_human_phrase between turns so the human does not need to prompt you again.",
         });
       },
     },
     {
-      name: "tunein_get_session_state",
+      name: "riff_get_session_state",
       title: "Read the live session",
       description:
-        "Inspect the current TuneIn session, shared musical settings, participants, and recent performance events. Read this before choosing what to play.",
+        "Inspect the current Agent Riff session, shared musical settings, participants, and recent performance events. Read this before choosing what to play.",
       inputSchema: objectSchema({
         event_limit: {
           type: "integer",
@@ -54,7 +54,7 @@ export function createTuneInTools(app) {
       execute: async ({ event_limit = 6 } = {}) => asToolResult(app.getSessionState(event_limit)),
     },
     {
-      name: "tunein_listen",
+      name: "riff_listen",
       title: "Listen to the human phrase",
       description:
         "Analyze recent notes and return pitch, density, safe notes, and a concrete reply plan. Perform directly from that plan without another read call.",
@@ -71,10 +71,10 @@ export function createTuneInTools(app) {
       execute: async ({ event_limit = 8 } = {}) => asToolResult(app.listen(event_limit)),
     },
     {
-      name: "tunein_wait_for_human_phrase",
+      name: "riff_wait_for_human_phrase",
       title: "Wait for the human's next phrase",
       description:
-        "Wait for the next completed human phrase. The result includes its notes, analysis, safe notes, and a target length and shape for a fuller reply. Perform directly without calling tunein_listen again, then call this tool again. The wait ends when the human pauses or after ten minutes.",
+        "Wait for the next completed human phrase. The result includes its notes, analysis, safe notes, and a target length and shape for a fuller reply. Perform directly without calling riff_listen again, then call this tool again. The wait ends when the human pauses or after ten minutes.",
       inputSchema: objectSchema({
         timeout_seconds: {
           type: "integer",
@@ -97,10 +97,10 @@ export function createTuneInTools(app) {
       ),
     },
     {
-      name: "tunein_perform_phrase",
+      name: "riff_perform_phrase",
       title: "Perform a musical phrase",
       description:
-        "Play one timed reply. Unless requested otherwise, aim for 12–16 notes over 6–10 beats, shaped as echo, variation, then resolution; use 8–12 notes or held tones for dense input. Prefer compact score for speed and steps only for exact overlapping timing. Optional compass changes apply here. Use tunein_perform_set for songs.",
+        "Play one timed reply. Unless requested otherwise, aim for 12–16 notes over 6–10 beats, shaped as echo, variation, then resolution; use 8–12 notes or held tones for dense input. Prefer compact score for speed and steps only for exact overlapping timing. Optional compass changes apply here. Use riff_perform_set for songs.",
       inputSchema: {
         ...objectSchema({
           instrument: { type: "string", enum: ["piano", "violin", "trumpet", "synth"], description: "The agent's instrument voice." },
@@ -138,7 +138,7 @@ export function createTuneInTools(app) {
       },
     },
     {
-      name: "tunein_perform_set",
+      name: "riff_perform_set",
       title: "Perform songs in one call",
       description:
         "Schedule up to eight songs or sections in one call. Prefer catalog songs to avoid web searches and note generation. Catalog: mary_had_a_little_lamb, frere_jacques, row_row_row_your_boat, ode_to_joy, entry_of_the_gladiators. Use song 'custom' with a compact score for anything else. The entire set continues playing after the tool returns; do not wait or poll between songs.",
@@ -179,7 +179,7 @@ export function createTuneInTools(app) {
       execute: async (input, context = {}) => asToolResult(await app.performSet(input, context.signal)),
     },
     {
-      name: "tunein_set_compass",
+      name: "riff_set_compass",
       title: "Set the session's musical compass",
       description:
         "Update the shared tempo, key, or scale after the human asks for a musical direction. Omitted fields stay unchanged.",
@@ -194,10 +194,10 @@ export function createTuneInTools(app) {
   ];
 }
 
-export async function registerTuneInTools(modelContext, app) {
+export async function registerAgentRiffTools(modelContext, app) {
   if (!modelContext?.registerTool) return [];
   const controller = new AbortController();
-  const tools = createTuneInTools(app);
+  const tools = createAgentRiffTools(app);
   await Promise.all(tools.map((tool) => modelContext.registerTool(tool, { signal: controller.signal })));
   return { names: tools.map((tool) => tool.name), dispose: () => controller.abort() };
 }

@@ -17,4 +17,4 @@ Please do not include real credentials, private performance data, or personal in
 
 ## Security model
 
-TuneIn is local-first and does not collect accounts or personal data. WebMCP tools expose only the current page session's musical state. State-changing tools use bounded schemas and runtime validation. The app does not request microphone, camera, location, or file permissions.
+Agent Riff is local-first and does not collect accounts or personal data. WebMCP tools expose only the current page session's musical state. State-changing tools use bounded schemas and runtime validation. The app does not request microphone, camera, location, or file permissions.

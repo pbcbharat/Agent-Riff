@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping TuneIn become a better place for people and agents to make music together.
+Thanks for helping Agent Riff become a better place for people and agents to make music together.
 
 ## Development
 

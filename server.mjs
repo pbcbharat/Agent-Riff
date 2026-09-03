@@ -34,5 +34,5 @@ createServer((request, response) => {
   });
   createReadStream(filePath).pipe(response);
 }).listen(port, "127.0.0.1", () => {
-  console.log(`TuneIn ready at http://127.0.0.1:${port}`);
+  console.log(`Agent Riff ready at http://127.0.0.1:${port}`);
 });

@@ -70,4 +70,4 @@ export default {
 
 await writeFile(join(serverDestination, "index.js"), worker);
 
-console.log(`Built TuneIn into dist/ with ${Object.keys(assets).length} bundled assets`);
+console.log(`Built Agent Riff into dist/ with ${Object.keys(assets).length} bundled assets`);
