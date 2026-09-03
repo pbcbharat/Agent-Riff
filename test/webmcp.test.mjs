@@ -9,6 +9,7 @@ const app = {
   listen: () => ({ analysis: { density: "open" } }),
   waitForHumanPhrase: async () => ({ outcome: "human_phrase" }),
   performPhrase: async () => ({ ok: true }),
+  performSet: async () => ({ ok: true }),
   setCompass: () => ({ ok: true }),
 };
 
@@ -20,13 +21,18 @@ test("TuneIn exposes a focused WebMCP collaboration surface", () => {
     "tunein_listen",
     "tunein_wait_for_human_phrase",
     "tunein_perform_phrase",
+    "tunein_perform_set",
     "tunein_set_compass",
   ]);
   assert.equal(tools.find(({ name }) => name === "tunein_listen").annotations.readOnlyHint, true);
   assert.equal(tools.find(({ name }) => name === "tunein_wait_for_human_phrase").annotations.readOnlyHint, true);
   const performTool = tools.find(({ name }) => name === "tunein_perform_phrase");
-  assert.equal(performTool.inputSchema.properties.steps.maxItems, 32);
+  assert.equal(performTool.inputSchema.properties.steps.maxItems, 128);
   assert.deepEqual(performTool.inputSchema.properties.steps.items.properties.note.enum, NOTES);
+  const setTool = tools.find(({ name }) => name === "tunein_perform_set");
+  assert.equal(setTool.inputSchema.properties.songs.maxItems, 8);
+  assert.ok(setTool.inputSchema.properties.songs.items.properties.song.enum.includes("ode_to_joy"));
+  assert.match(setTool.description, /avoid web searches/);
   assert.ok(tools.every(({ name, description }) => name.length <= 30 && description.length <= 500));
   assert.ok(tools.every(({ annotations }) => (
     Object.keys(annotations).every((key) => ["readOnlyHint", "untrustedContentHint"].includes(key))
@@ -42,8 +48,8 @@ test("tools register through document.modelContext-compatible API", async () => 
   const calls = [];
   const modelContext = { registerTool: async (tool, options) => calls.push({ tool, options }) };
   const registration = await registerTuneInTools(modelContext, app);
-  assert.equal(calls.length, 6);
-  assert.equal(registration.names.length, 6);
+  assert.equal(calls.length, 7);
+  assert.equal(registration.names.length, 7);
   assert.ok(calls.every(({ options }) => options.signal instanceof AbortSignal));
   registration.dispose();
   assert.ok(calls.every(({ options }) => options.signal.aborted));
@@ -89,4 +95,25 @@ test("wait tool forwards bounded session controls and cancellation", async () =>
   assert.deepEqual(calls[0].options, { timeoutSeconds: 420, phrasePauseMs: 900 });
   assert.equal(calls[0].receivedSignal, signal);
   assert.equal(tool.inputSchema.properties.timeout_seconds.maximum, 600);
+  assert.equal(tool.inputSchema.properties.phrase_pause_ms.minimum, 400);
+  assert.equal(tool.inputSchema.properties.phrase_pause_ms.default, 850);
+});
+
+test("set tool forwards one compact multi-song request and cancellation", async () => {
+  const signal = new AbortController().signal;
+  const calls = [];
+  const setApp = {
+    ...app,
+    performSet: async (input, receivedSignal) => {
+      calls.push({ input, receivedSignal });
+      return { ok: true, scheduledSongs: input.songs.length };
+    },
+  };
+  const tool = createTuneInTools(setApp).find(({ name }) => name === "tunein_perform_set");
+  const input = { songs: [{ song: "mary_had_a_little_lamb" }, { song: "ode_to_joy" }] };
+  const result = JSON.parse(await tool.execute(input, { signal }));
+
+  assert.equal(result.scheduledSongs, 2);
+  assert.deepEqual(calls[0].input, input);
+  assert.equal(calls[0].receivedSignal, signal);
 });

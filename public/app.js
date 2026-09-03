@@ -9,6 +9,7 @@ import {
   noteToMidi,
   noteToStaffStep,
   scaleNotes,
+  validatePerformanceSet,
   validatePhrase,
 } from "./core.js";
 import { createTuneInTools } from "./webmcp.js";
@@ -653,7 +654,7 @@ function listen(eventLimit = 16) {
       instrument: event.instrument,
       player: event.actor,
     })),
-    safeNotesToTry: scaleNotes(state.key, state.scale, 4),
+    safeNotesToTry: scaleNotes(state.key, state.scale, 4).filter((note) => NOTES.includes(note)),
   };
 }
 
@@ -673,11 +674,11 @@ function humanNotesAfterCursor(cursor) {
     : completed.filter((event) => event.timestamp > (cursor.timestamp || 0));
 }
 
-function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 1200 } = {}, signal) {
+function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, signal) {
   if (!state.agentName) throw new Error("Join the session before waiting for a human phrase.");
 
   const boundedTimeoutSeconds = Math.max(15, Math.min(600, Math.round(Number(timeoutSeconds) || 600)));
-  const boundedPhrasePauseMs = Math.max(500, Math.min(3000, Math.round(Number(phrasePauseMs) || 1200)));
+  const boundedPhrasePauseMs = Math.max(400, Math.min(3000, Math.round(Number(phrasePauseMs) || 850)));
   const startedAt = Date.now();
 
   if (!state.waitCursor) {
@@ -724,7 +725,9 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 1200 } = {},
               durationBeats: Number(Number(event.durationBeats).toFixed(2)),
             })),
           },
-          nextAction: "Call tunein_listen, perform one compatible reply, then call tunein_wait_for_human_phrase again to continue the live jam.",
+          analysis: analyzePerformance(notes, state),
+          safeNotesToTry: scaleNotes(state.key, state.scale, 4).filter((note) => NOTES.includes(note)),
+          nextAction: "Perform one compatible reply directly from this analysis; do not call tunein_listen again. Then call tunein_wait_for_human_phrase to continue the live jam.",
         });
         return;
       }
@@ -775,9 +778,16 @@ async function performPhrase(input, signal) {
   if (!state.agentName) throw new Error("Join the session before performing a phrase.");
   const phrase = validatePhrase(input);
   const actor = state.agentName;
+  const compassUpdate = Object.fromEntries(
+    ["bpm", "key", "scale"]
+      .filter((key) => input?.[key] !== undefined)
+      .map((key) => [key, input[key]]),
+  );
+  if (Object.keys(compassUpdate).length) setCompass(compassUpdate, actor);
 
   const phraseStartedAt = Date.now();
-  recordEvent({ type: "phrase", actor, role: "agent", instrument: phrase.instrument, label: phrase.label, timestamp: phraseStartedAt });
+  const turnId = crypto.randomUUID();
+  recordEvent({ id: turnId, turnId, type: "phrase", actor, role: "agent", instrument: phrase.instrument, label: phrase.label, timestamp: phraseStartedAt });
   const secondsPerBeat = 60 / state.bpm;
   const timers = [];
 
@@ -797,6 +807,7 @@ async function performPhrase(input, signal) {
         instrument: phrase.instrument,
         actor,
         role: "agent",
+        turnId,
         duration,
         durationBeats: step.durationBeats,
         velocity: phrase.velocity,
@@ -808,14 +819,107 @@ async function performPhrase(input, signal) {
 
   signal?.addEventListener("abort", () => timers.forEach(clearTimeout), { once: true });
   const endingBeat = Math.max(...phrase.steps.map((step) => step.beat + step.durationBeats));
+  const durationSeconds = Number((endingBeat * secondsPerBeat).toFixed(2));
   return {
     ok: true,
     session: "current_page",
     performer: actor,
     instrument: phrase.instrument,
     scheduledNotes: phrase.steps.length,
-    durationSeconds: Number((endingBeat * secondsPerBeat).toFixed(2)),
+    durationSeconds,
+    acceptedAt: new Date(phraseStartedAt).toISOString(),
+    scheduledEndAt: new Date(phraseStartedAt + durationSeconds * 1000).toISOString(),
     message: `Scheduled “${phrase.label}”. For a live jam, call tunein_wait_for_human_phrase now; it will return after the human plays and pauses.`,
+  };
+}
+
+async function performSet(input, signal) {
+  if (!state.agentName) throw new Error("Join the session before performing a set.");
+  if (signal?.aborted) throw new DOMException("The performance set was cancelled.", "AbortError");
+
+  const performance = validatePerformanceSet(input, state);
+  const actor = state.agentName;
+  const acceptedAt = Date.now();
+  const timers = [];
+  const summaries = [];
+  let cursorSeconds = 0.08;
+
+  ensureAudio();
+
+  performance.songs.forEach((song, songIndex) => {
+    const songStartSeconds = cursorSeconds;
+    const songStartedAt = acceptedAt + songStartSeconds * 1000;
+    const turnId = crypto.randomUUID();
+    const secondsPerBeat = 60 / song.bpm;
+    const durationSeconds = song.totalBeats * secondsPerBeat;
+
+    timers.push(setTimeout(() => {
+      if (signal?.aborted) return;
+      setCompass({ bpm: song.bpm, key: song.key, scale: song.scale }, actor);
+      recordEvent({
+        id: turnId,
+        turnId,
+        type: "phrase",
+        actor,
+        role: "agent",
+        instrument: song.instrument,
+        label: song.title,
+        timestamp: songStartedAt,
+      });
+    }, songStartSeconds * 1000));
+
+    song.steps.forEach((step) => {
+      timers.push(setTimeout(() => {
+        if (signal?.aborted) return;
+        const duration = step.durationBeats * secondsPerBeat;
+        makeVoice(step.note, song.instrument, song.velocity, duration);
+        showAgentNote(step.note, song.instrument, duration);
+        $$(`[data-note="${step.note}"]`).forEach((key) => {
+          key.classList.add("active");
+          setTimeout(() => key.classList.remove("active"), duration * 1000);
+        });
+        recordEvent({
+          type: "note",
+          note: step.note,
+          instrument: song.instrument,
+          actor,
+          role: "agent",
+          turnId,
+          duration,
+          durationBeats: step.durationBeats,
+          velocity: song.velocity,
+          timestamp: songStartedAt + step.beat * secondsPerBeat * 1000,
+        });
+      }, (songStartSeconds + step.beat * secondsPerBeat) * 1000));
+    });
+
+    summaries.push({
+      song: song.songId,
+      label: song.title,
+      instrument: song.instrument,
+      bpm: song.bpm,
+      scheduledNotes: song.steps.length,
+      startsAfterSeconds: Number(songStartSeconds.toFixed(2)),
+      durationSeconds: Number(durationSeconds.toFixed(2)),
+    });
+
+    cursorSeconds += durationSeconds;
+    if (songIndex < performance.songs.length - 1) cursorSeconds += song.gapBeats * secondsPerBeat;
+  });
+
+  signal?.addEventListener("abort", () => timers.forEach(clearTimeout), { once: true });
+  const durationSeconds = Number(cursorSeconds.toFixed(2));
+  return {
+    ok: true,
+    session: "current_page",
+    performer: actor,
+    scheduledSongs: performance.songs.length,
+    scheduledNotes: performance.totalNotes,
+    durationSeconds,
+    songs: summaries,
+    acceptedAt: new Date(acceptedAt).toISOString(),
+    scheduledEndAt: new Date(acceptedAt + durationSeconds * 1000).toISOString(),
+    message: "The complete set is scheduled on the current page and will continue playing after this tool returns. Do not wait, poll, split the songs, or call another playback tool.",
   };
 }
 
@@ -873,7 +977,7 @@ function toggleMetronome() {
 
 function bindUI() {
   $("#copy-prompt").addEventListener("click", async () => {
-    const prompt = `Use the current TuneIn page at ${window.location.href}. Inspect and use the WebMCP site tools provided by the page instead of visual browser automation. Call tunein_join_session, then stay for a live call-and-response jam. Listen and answer my phrases, and call tunein_wait_for_human_phrase after each reply so I do not need to prompt you again. Wait for up to 10 minutes between turns.`;
+    const prompt = `Use the current TuneIn page at ${window.location.href}. Inspect and use the WebMCP site tools provided by the page instead of visual browser automation. Call tunein_join_session, then stay for a live call-and-response jam. Listen and answer my first phrase. After each reply, call tunein_wait_for_human_phrase; its result already includes the analysis needed for your next reply, so perform directly without calling tunein_listen again. Wait for up to 10 minutes between turns.`;
     await navigator.clipboard.writeText(prompt);
     showToast("Agent prompt copied");
   });
@@ -984,6 +1088,7 @@ const appAdapter = {
   listen,
   waitForHumanPhrase,
   performPhrase,
+  performSet,
   setCompass,
 };
 

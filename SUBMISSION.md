@@ -34,16 +34,17 @@ This back-and-forth is difficult to achieve with a traditional chatbot or an age
 
 ## WebMCP implementation
 
-TuneIn uses the current imperative API at `document.modelContext.registerTool()` and registers six focused tools:
+TuneIn uses the current imperative API at `document.modelContext.registerTool()` and registers seven focused tools:
 
 1. `tunein_join_session`
 2. `tunein_get_session_state`
 3. `tunein_listen`
 4. `tunein_wait_for_human_phrase`
 5. `tunein_perform_phrase`
-6. `tunein_set_compass`
+6. `tunein_perform_set`
+7. `tunein_set_compass`
 
-Each tool has a descriptive JSON Schema and security-relevant annotations. Read tools return compact, structured musical context. Mutating tools reuse the same validated application functions as the visible interface. The performance tool supports overlapping notes, beat-relative scheduling, multiple timbres, bounded phrase length, bounded velocity, and cancellation.
+Each tool has a descriptive JSON Schema and security-relevant annotations. Read tools return compact, structured musical context. Mutating tools reuse the same validated application functions as the visible interface. The phrase tool supports overlapping notes, beat-relative scheduling, multiple timbres, bounded phrase length, bounded velocity, and cancellation. The set tool provides a compact score format and a small public-domain melody catalog so an explicit song request can be scheduled in one call instead of many model/browser round trips.
 
 ## Judging-criteria framing
 

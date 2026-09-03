@@ -1,4 +1,8 @@
-import { NOTES } from "./core.js";
+import {
+  MAX_PHRASE_STEPS,
+  NOTES,
+  PUBLIC_DOMAIN_SONG_IDS,
+} from "./core.js";
 
 const objectSchema = (properties, required = []) => ({
   type: "object",
@@ -70,7 +74,7 @@ export function createTuneInTools(app) {
       name: "tunein_wait_for_human_phrase",
       title: "Wait for the human's next phrase",
       description:
-        "Wait on the current page for the next completed human phrase instead of ending the task or asking the user to type again. For a live jam, call this after each agent reply. When it returns human_phrase, listen, perform one compatible reply, then call this tool again. The wait ends when the human pauses or after at most ten minutes.",
+        "Wait for the next completed human phrase instead of ending the task. The result already includes the phrase notes, musical analysis, and safe notes, so perform directly without calling tunein_listen again. After replying, call this tool again. The wait ends when the human pauses or after ten minutes.",
       inputSchema: objectSchema({
         timeout_seconds: {
           type: "integer",
@@ -81,14 +85,14 @@ export function createTuneInTools(app) {
         },
         phrase_pause_ms: {
           type: "integer",
-          minimum: 500,
+          minimum: 400,
           maximum: 3000,
-          default: 1200,
+          default: 850,
           description: "Silence after the latest human note that marks the phrase as complete.",
         },
       }),
       annotations: { readOnlyHint: true, untrustedContentHint: true },
-      execute: async ({ timeout_seconds = 600, phrase_pause_ms = 1200 } = {}, context = {}) => asToolResult(
+      execute: async ({ timeout_seconds = 600, phrase_pause_ms = 850 } = {}, context = {}) => asToolResult(
         await app.waitForHumanPhrase({ timeoutSeconds: timeout_seconds, phrasePauseMs: phrase_pause_ms }, context.signal),
       ),
     },
@@ -96,21 +100,24 @@ export function createTuneInTools(app) {
       name: "tunein_perform_phrase",
       title: "Perform a musical phrase",
       description:
-        "Play a timed phrase into the current session as the agent. Choose notes that complement the session state. Beats are offsets from the phrase start; notes may overlap to form harmony.",
+        "Play one timed phrase as the agent. Optional tempo, key, and scale are applied in the same call. For complete songs or multi-song requests, prefer tunein_perform_set because its compact score avoids large note-by-note payloads and repeated calls.",
       inputSchema: objectSchema(
         {
           instrument: { type: "string", enum: ["piano", "violin", "trumpet", "synth"], description: "The agent's instrument voice." },
-          label: { type: "string", maxLength: 48, description: "A concise description shown to the human, such as 'gentle answer'." },
+          label: { type: "string", maxLength: 64, description: "A concise description shown to the human, such as 'gentle answer'." },
           velocity: { type: "number", minimum: 0.15, maximum: 1, default: 0.68, description: "Phrase loudness from 0.15 to 1." },
+          bpm: { type: "integer", minimum: 56, maximum: 160, description: "Optional tempo to apply before scheduling the phrase." },
+          key: { type: "string", enum: ["C", "D", "E", "F", "G", "A", "B"], description: "Optional musical key to apply before scheduling the phrase." },
+          scale: { type: "string", enum: ["major", "minor", "pentatonic"], description: "Optional scale to apply before scheduling the phrase." },
           steps: {
             type: "array",
             minItems: 1,
-            maxItems: 32,
-            description: "One to 32 notes. Matching beat values create a chord.",
+            maxItems: MAX_PHRASE_STEPS,
+            description: `One to ${MAX_PHRASE_STEPS} notes. Matching beat values create a chord.`,
             items: objectSchema(
               {
                 note: { type: "string", enum: NOTES, description: "A pitch on the shared C4–E5 instrument, such as G4 or C#5." },
-                beat: { type: "number", minimum: 0, maximum: 32, description: "Start offset in beats from the beginning of the phrase." },
+                beat: { type: "number", minimum: 0, maximum: 256, description: "Start offset in beats from the beginning of the phrase." },
                 duration_beats: { type: "number", minimum: 0.1, maximum: 8, default: 0.45, description: "How long the note sounds in beats." },
               },
               ["note", "beat"],
@@ -124,6 +131,47 @@ export function createTuneInTools(app) {
         const result = await app.performPhrase(input, context.signal);
         return asToolResult(result);
       },
+    },
+    {
+      name: "tunein_perform_set",
+      title: "Perform songs in one call",
+      description:
+        "Schedule up to eight songs or sections in one call. Prefer catalog songs to avoid web searches and note generation. Catalog: mary_had_a_little_lamb, frere_jacques, row_row_row_your_boat, ode_to_joy, entry_of_the_gladiators. Use song 'custom' with a compact score for anything else. The entire set continues playing after the tool returns; do not wait or poll between songs.",
+      inputSchema: objectSchema(
+        {
+          songs: {
+            type: "array",
+            minItems: 1,
+            maxItems: 8,
+            description: "Ordered songs or sections to schedule as one uninterrupted set.",
+            items: objectSchema(
+              {
+                song: {
+                  type: "string",
+                  enum: [...PUBLIC_DOMAIN_SONG_IDS, "custom"],
+                  description: "A built-in public-domain song, or custom when providing compact score notation.",
+                },
+                score: {
+                  type: "string",
+                  maxLength: 6000,
+                  description: "Required only for custom: whitespace-separated NOTE/DURATION tokens, such as 'E4 D4 C4/2 R/1 C4+E4+G4/2'. Duration defaults to one beat; R is a rest and + forms a chord.",
+                },
+                label: { type: "string", maxLength: 64, description: "Optional display label; catalog songs already have one." },
+                instrument: { type: "string", enum: ["piano", "violin", "trumpet", "synth"], description: "Optional instrument override." },
+                bpm: { type: "integer", minimum: 56, maximum: 160, description: "Optional tempo override for this song." },
+                key: { type: "string", enum: ["C", "D", "E", "F", "G", "A", "B"], description: "Optional key override for this song." },
+                scale: { type: "string", enum: ["major", "minor", "pentatonic"], description: "Optional scale override for this song." },
+                velocity: { type: "number", minimum: 0.15, maximum: 1, description: "Optional loudness override from 0.15 to 1." },
+                gap_beats: { type: "number", minimum: 0, maximum: 16, default: 2, description: "Silence after this song before the next one." },
+              },
+              ["song"],
+            ),
+          },
+        },
+        ["songs"],
+      ),
+      annotations: { readOnlyHint: false, untrustedContentHint: false },
+      execute: async (input, context = {}) => asToolResult(await app.performSet(input, context.signal)),
     },
     {
       name: "tunein_set_compass",

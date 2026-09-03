@@ -13,7 +13,7 @@ The useful part is the exchange: a human contributes taste, timing, and surprise
 - One focused, local page session with no account or setup required
 - A scrolling, pitch-accurate notation view and accessible event history showing human and agent turns
 - Shared tempo, key, and scale controls
-- Six imperative WebMCP tools for joining, observing, listening, waiting, performing, and steering the session
+- Seven imperative WebMCP tools for joining, observing, listening, waiting, performing, batching songs, and steering the session
 - A dependency-free build with automated tests and a Cloudflare Worker-compatible output
 
 ## WebMCP tools
@@ -25,11 +25,12 @@ TuneIn registers tools with the current `document.modelContext.registerTool()` A
 | `tunein_join_session` | Take the agent seat in the current page session | Yes |
 | `tunein_get_session_state` | Read participants, compass, instruments, and recent events | No |
 | `tunein_listen` | Analyze recent pitch center, register, density, and musical space | No |
-| `tunein_wait_for_human_phrase` | Wait for the next completed human phrase for up to ten minutes | No |
-| `tunein_perform_phrase` | Schedule a validated, timed phrase with an instrument voice | Yes |
+| `tunein_wait_for_human_phrase` | Wait for the next completed human phrase and return its listening analysis | No |
+| `tunein_perform_phrase` | Schedule up to 128 validated notes, optionally changing the compass in the same call | Yes |
+| `tunein_perform_set` | Schedule up to eight catalog or compact-score songs in one call | Yes |
 | `tunein_set_compass` | Change tempo, key, or scale at the person's request | Yes |
 
-Read-only and state-changing tools are annotated accordingly. Tool inputs use bounded JSON Schemas, phrases are validated again at execution time, and cancellation signals stop notes that have not yet been scheduled.
+Read-only and state-changing tools are annotated accordingly. Tool inputs use bounded JSON Schemas, phrases are validated again at execution time, and cancellation signals stop notes that have not yet been scheduled. The optional public-domain catalog and compact `NOTE/DURATION` score format avoid repeated browser round trips and large note-object payloads for explicit song requests; the granular phrase tool remains the default for improvisation.
 
 ## Run locally
 
@@ -59,7 +60,7 @@ Use ChatGPT's in-app browser, which supports WebMCP, or Chrome 149+ with `chrome
 2. Play a short phrase with the on-screen keys or the `A`–`;` keyboard row.
 3. Copy the suggested agent prompt.
 4. Ask your agent to use TuneIn’s WebMCP tools to join the current session and stay for a live call-and-response jam.
-5. Keep playing. After each answer, the agent can wait on the page for the next phrase without another chat message.
+5. Keep playing. After each answer, the agent can wait on the page for the next phrase without another chat message. The wait result includes the musical analysis needed for the next response, so the agent does not need a second listening call.
 
 For development in a browser without native WebMCP, the same tool definitions are exposed read-only at `window.__TUNEIN_TOOLS__` for manual inspection. The app does not install a fake `document.modelContext` implementation.
 
@@ -78,7 +79,7 @@ The session is intentionally local to the current page and browser. TuneIn does 
 
 - There are no API keys, credentials, analytics IDs, or user accounts.
 - No microphone, camera, location, or media-library permission is requested.
-- Notes are synthesized in the browser; the repository contains no sampled or copyrighted music.
+- Notes are synthesized in the browser; the repository contains no sampled recordings. Its small built-in melody catalog contains public-domain material.
 - `.env` files and common local artifacts are ignored.
 
 Please report security concerns using [SECURITY.md](SECURITY.md).

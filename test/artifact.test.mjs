@@ -18,7 +18,9 @@ test("production worker serves the app shell and static modules", async () => {
   assert.match(pageHtml, /id="instrument-options"/);
   assert.doesNotMatch(pageHtml, /id="instrument-select"/);
   assert.match(script.headers.get("content-type"), /text\/javascript/);
-  assert.match(await script.text(), /tunein_perform_phrase/);
+  const toolScript = await script.text();
+  assert.match(toolScript, /tunein_perform_phrase/);
+  assert.match(toolScript, /tunein_perform_set/);
 });
 
 test("production worker falls back to the app shell for navigation paths", async () => {

@@ -1,13 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  MAX_PHRASE_STEPS,
+  PUBLIC_DOMAIN_SONG_IDS,
   analyzePerformance,
   groupPerformanceEvents,
   isValidNote,
   notationForDuration,
   noteToFrequency,
   noteToStaffStep,
+  parseCompactScore,
   scaleNotes,
+  validatePerformanceSet,
   validatePhrase,
 } from "../public/core.js";
 
@@ -80,6 +84,42 @@ test("phrases are constrained before audio is scheduled", () => {
   });
   assert.equal(phrase.instrument, "violin");
   assert.equal(phrase.velocity, 1);
+  assert.equal(validatePhrase({
+    instrument: "piano",
+    steps: Array.from({ length: MAX_PHRASE_STEPS }, (_, beat) => ({ note: "C4", beat })),
+  }).steps.length, MAX_PHRASE_STEPS);
+  assert.throws(() => validatePhrase({
+    instrument: "piano",
+    steps: Array.from({ length: MAX_PHRASE_STEPS + 1 }, (_, beat) => ({ note: "C4", beat })),
+  }), /128 note steps/);
   assert.throws(() => validatePhrase({ instrument: "piano", steps: [{ note: "Z9", beat: 0 }] }));
   assert.throws(() => validatePhrase({ instrument: "piano", steps: [{ note: "C3", beat: 0 }] }), /C4–E5/);
+});
+
+test("compact scores expand rests, durations, and chords without verbose note objects", () => {
+  const score = parseCompactScore("C4/0.5 R/0.5 E4+G4/2 | C5");
+  assert.deepEqual(score.steps, [
+    { note: "C4", beat: 0, durationBeats: 0.5 },
+    { note: "E4", beat: 1, durationBeats: 2 },
+    { note: "G4", beat: 1, durationBeats: 2 },
+    { note: "C5", beat: 3, durationBeats: 1 },
+  ]);
+  assert.equal(score.totalBeats, 4);
+  assert.throws(() => parseCompactScore("H9"), /outside the shared/);
+});
+
+test("the public-domain catalog validates an entire five-song set in one input", () => {
+  const set = validatePerformanceSet({
+    songs: PUBLIC_DOMAIN_SONG_IDS.map((song) => ({ song })),
+  });
+  assert.equal(set.songs.length, 5);
+  assert.equal(set.totalNotes, 188);
+  assert.equal(set.songs[0].title, "Mary Had a Little Lamb");
+  assert.equal(set.songs.at(-1).bpm, 160);
+
+  const custom = validatePerformanceSet({
+    songs: [{ song: "custom", score: "C4 E4 G4 C5/2", instrument: "piano", bpm: 100 }],
+  });
+  assert.equal(custom.totalNotes, 4);
+  assert.throws(() => validatePerformanceSet({ songs: [{ song: "custom" }] }), /compact score/);
 });
