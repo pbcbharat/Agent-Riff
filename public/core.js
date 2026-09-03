@@ -306,6 +306,41 @@ export function validatePerformanceSet(input = {}, fallback = { bpm: 96, key: "C
   return { songs, totalNotes };
 }
 
+export function performanceReplaySchedule(events = [], bpm = 96) {
+  const safeBpm = Math.max(1, Number(bpm) || 96);
+  const notes = events
+    .map((event, index) => ({ event, index, timestamp: Number(event?.timestamp) }))
+    .filter(({ event }) => event?.type === "note" && isValidNote(event.note))
+    .sort((a, b) => (
+      (Number.isFinite(a.timestamp) ? a.timestamp : a.index)
+      - (Number.isFinite(b.timestamp) ? b.timestamp : b.index)
+    ));
+  if (!notes.length) return [];
+
+  const firstTimestamp = Number.isFinite(notes[0].timestamp) ? notes[0].timestamp : null;
+  return notes.map(({ event, index, timestamp }) => {
+    const measuredDuration = Number(event.duration);
+    const beatDuration = Number(event.durationBeats) * 60 / safeBpm;
+    const durationSeconds = Number.isFinite(measuredDuration) && measuredDuration > 0
+      ? measuredDuration
+      : Number.isFinite(beatDuration) && beatDuration > 0
+        ? beatDuration
+        : 0.35;
+    const delaySeconds = firstTimestamp !== null && Number.isFinite(timestamp)
+      ? Math.max(0, (timestamp - firstTimestamp) / 1000)
+      : index * 0.5 * 60 / safeBpm;
+
+    return {
+      id: String(event.id || `replay-note-${index}`),
+      note: event.note,
+      instrument: INSTRUMENTS.includes(event.instrument) ? event.instrument : "piano",
+      velocity: Math.min(1, Math.max(0.15, Number(event.velocity ?? 0.68))),
+      delaySeconds: Number(delaySeconds.toFixed(3)),
+      durationSeconds: Number(Math.min(8, Math.max(0.08, durationSeconds)).toFixed(3)),
+    };
+  });
+}
+
 export function groupPerformanceEvents(events = []) {
   const groups = [];
   for (const event of events) {

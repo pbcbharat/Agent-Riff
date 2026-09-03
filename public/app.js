@@ -8,6 +8,7 @@ import {
   noteToFrequency,
   noteToMidi,
   noteToStaffStep,
+  performanceReplaySchedule,
   scaleNotes,
   validatePerformanceSet,
   validatePhrase,
@@ -261,6 +262,16 @@ function createActivityCard(group) {
   const card = document.createElement("li");
   card.className = `activity-turn ${group.role}`;
   card.dataset.groupId = group.id;
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-label", `Replay ${group.actor}'s phrase`);
+  card.title = `Replay ${group.actor}'s phrase`;
+  card.addEventListener("click", () => replayActivityGroup(group.id, card));
+  card.addEventListener("keydown", (event) => {
+    if (!["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    replayActivityGroup(group.id, card);
+  });
 
   const header = document.createElement("div");
   header.className = "activity-turn-header";
@@ -279,6 +290,36 @@ function createActivityCard(group) {
   summary.className = "activity-turn-summary";
   card.append(header, notes, summary);
   return card;
+}
+
+function replayActivityGroup(groupId, card) {
+  const group = groupPerformanceEvents(state.events).find((item) => item.id === groupId);
+  const schedule = performanceReplaySchedule(group?.events, state.bpm);
+  if (!group || !schedule.length) {
+    showToast("This phrase has no finished notes to replay yet");
+    return;
+  }
+
+  ensureAudio();
+  const activeReplays = Number(card.dataset.activeReplays || 0) + 1;
+  card.dataset.activeReplays = String(activeReplays);
+  card.classList.add("replaying");
+  card.setAttribute("aria-label", `Replaying ${group.actor}'s phrase`);
+
+  schedule.forEach((item) => {
+    const play = () => makeVoice(item.note, item.instrument, item.velocity, item.durationSeconds);
+    if (item.delaySeconds <= 0) play();
+    else setTimeout(play, item.delaySeconds * 1000);
+  });
+
+  const endingSeconds = Math.max(...schedule.map((item) => item.delaySeconds + item.durationSeconds));
+  setTimeout(() => {
+    const remaining = Math.max(0, Number(card.dataset.activeReplays || 1) - 1);
+    card.dataset.activeReplays = String(remaining);
+    if (remaining) return;
+    card.classList.remove("replaying");
+    card.setAttribute("aria-label", `Replay ${group.actor}'s phrase`);
+  }, endingSeconds * 1000 + 120);
 }
 
 function updateActivityCard(card, group) {
@@ -316,6 +357,10 @@ function updateActivityCard(card, group) {
 
   const actor = card.querySelector(".activity-actor");
   if (actor.textContent !== group.actor) actor.textContent = group.actor;
+  if (!card.classList.contains("replaying")) {
+    card.setAttribute("aria-label", `Replay ${group.actor}'s phrase`);
+    card.title = `Replay ${group.actor}'s phrase`;
+  }
   const summaryText = [
     phrase?.label ? `“${phrase.label}”` : null,
     instruments.join(" + ") || null,

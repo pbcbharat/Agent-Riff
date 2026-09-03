@@ -912,11 +912,51 @@ kbd {
   border: 1px solid rgba(200, 255, 77, 0.14);
   border-radius: 10px;
   background: rgba(200, 255, 77, 0.035);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.activity-turn:hover,
+.activity-turn:focus-visible {
+  border-color: rgba(200, 255, 77, 0.42);
+  background: rgba(200, 255, 77, 0.075);
+}
+
+.activity-turn:focus-visible {
+  outline: 2px solid rgba(200, 255, 77, 0.7);
+  outline-offset: 2px;
+}
+
+.activity-turn:active { transform: translateY(1px); }
+
+.activity-turn.replaying {
+  border-color: rgba(200, 255, 77, 0.72);
+  box-shadow: 0 0 0 1px rgba(200, 255, 77, 0.12), 0 0 18px rgba(200, 255, 77, 0.08);
 }
 
 .activity-turn.agent {
   border-color: rgba(166, 150, 255, 0.18);
   background: rgba(166, 150, 255, 0.045);
+}
+
+.activity-turn.agent:hover,
+.activity-turn.agent:focus-visible {
+  border-color: rgba(166, 150, 255, 0.5);
+  background: rgba(166, 150, 255, 0.09);
+}
+
+.activity-turn.agent:focus-visible { outline-color: rgba(166, 150, 255, 0.75); }
+
+.activity-turn.agent.replaying {
+  border-color: rgba(166, 150, 255, 0.76);
+  box-shadow: 0 0 0 1px rgba(166, 150, 255, 0.14), 0 0 18px rgba(166, 150, 255, 0.1);
+}
+
+.activity-turn.replaying .activity-color { animation: activity-replay-pulse 700ms ease-in-out infinite alternate; }
+
+@keyframes activity-replay-pulse {
+  from { opacity: 0.45; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1.35); }
 }
 
 .activity-turn-header {

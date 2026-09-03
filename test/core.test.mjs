@@ -10,6 +10,7 @@ import {
   noteToFrequency,
   noteToStaffStep,
   parseCompactScore,
+  performanceReplaySchedule,
   scaleNotes,
   validatePerformanceSet,
   validatePhrase,
@@ -139,6 +140,22 @@ test("compact scores expand rests, durations, and chords without verbose note ob
   ]);
   assert.equal(score.totalBeats, 4);
   assert.throws(() => parseCompactScore("H9"), /outside the shared/);
+});
+
+test("performance cards can replay stored timing, duration, and instruments independently", () => {
+  const schedule = performanceReplaySchedule([
+    { id: "phrase", type: "phrase", timestamp: 900 },
+    { id: "one", type: "note", note: "C4", instrument: "piano", velocity: 0.7, timestamp: 1000, duration: 0.4 },
+    { id: "two", type: "note", note: "E4", instrument: "violin", velocity: 0.6, timestamp: 1500, durationBeats: 1 },
+    { id: "three", type: "note", note: "G4", instrument: "synth", timestamp: 1500, duration: 0.25 },
+  ], 120);
+
+  assert.deepEqual(schedule, [
+    { id: "one", note: "C4", instrument: "piano", velocity: 0.7, delaySeconds: 0, durationSeconds: 0.4 },
+    { id: "two", note: "E4", instrument: "violin", velocity: 0.6, delaySeconds: 0.5, durationSeconds: 0.5 },
+    { id: "three", note: "G4", instrument: "synth", velocity: 0.68, delaySeconds: 0.5, durationSeconds: 0.25 },
+  ]);
+  assert.deepEqual(performanceReplaySchedule([{ type: "settings" }]), []);
 });
 
 test("the public-domain catalog validates an entire five-song set in one input", () => {
