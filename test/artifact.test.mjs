@@ -29,6 +29,7 @@ test("production worker falls back to the app shell for share links", async () =
 
 test("Vercel publishes the static client artifact with hardened response headers", async () => {
   const config = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8"));
+  assert.equal(config.framework, null);
   assert.equal(config.buildCommand, "npm run build");
   assert.equal(config.outputDirectory, "dist/client");
   assert.ok(config.headers[0].headers.some(({ key, value }) => key === "X-Content-Type-Options" && value === "nosniff"));
