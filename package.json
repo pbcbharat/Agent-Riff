@@ -1,0 +1,18 @@
+{
+  "name": "tunein-webmcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A shared musical canvas where people and browser agents improvise together through WebMCP.",
+  "scripts": {
+    "dev": "node server.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/core.test.mjs test/webmcp.test.mjs",
+    "test:artifact": "node --test test/artifact.test.mjs",
+    "check": "npm run test && npm run build && npm run test:artifact"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

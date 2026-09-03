@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#11130f" />
+    <meta
+      name="description"
+      content="TuneIn is a live music board where people and AI agents listen, improvise, and make something neither would make alone."
+    />
+    <meta property="og:title" content="TuneIn — play a thought together" />
+    <meta
+      property="og:description"
+      content="A shared musical canvas for people and browser agents, powered by WebMCP."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TuneIn — play a thought together" />
+    <meta
+      name="twitter:description"
+      content="A shared musical canvas for people and browser agents, powered by WebMCP."
+    />
+    <meta name="twitter:image" content="/og.png" />
+    <title>TuneIn — play a thought together</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#instrument">Skip to instrument</a>
+
+    <header class="app-header">
+      <a class="brand" href="/" aria-label="TuneIn home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>TuneIn</span>
+      </a>
+      <p class="brand-line">Play a thought together.</p>
+      <div class="header-status" aria-label="Application status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="mcp-status">Checking WebMCP</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <div class="workspace-shell">
+      <section class="room-bar" aria-labelledby="room-heading">
+        <div class="room-identity">
+          <span class="eyebrow" id="room-heading">Live room</span>
+          <div class="room-code-wrap">
+            <strong id="room-code">SOLO</strong>
+            <span id="room-state">Private rehearsal</span>
+          </div>
+        </div>
+
+        <div class="room-actions">
+          <button class="button secondary" id="new-room" type="button">
+            <span aria-hidden="true">＋</span> New room
+          </button>
+          <form id="join-form" class="join-form" autocomplete="off">
+            <label class="sr-only" for="join-code">Room key</label>
+            <input
+              id="join-code"
+              name="room"
+              maxlength="9"
+              placeholder="ROOM KEY"
+              spellcheck="false"
+              aria-describedby="join-help"
+            />
+            <button class="button primary" type="submit">Join</button>
+          </form>
+          <button class="icon-button" id="copy-room" type="button" aria-label="Copy room invitation" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v11H8z"></path><path d="M5 16H3V3h13v2"></path></svg>
+          </button>
+        </div>
+        <p class="sr-only" id="join-help">Enter the room key shared by another player.</p>
+      </section>
+
+      <div class="stage-grid">
+        <aside class="control-rail" aria-label="Performance controls">
+          <section class="rail-section instrument-section">
+            <div class="instrument-menu">
+              <button class="instrument-picker" id="instrument-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="instrument-options">
+                <span class="instrument-glyph piano-glyph" id="instrument-glyph" aria-hidden="true"></span>
+                <span class="instrument-current">
+                  <strong id="instrument-name">Piano</strong>
+                  <small id="instrument-description">Warm &amp; clear</small>
+                </span>
+                <span class="select-chevron" aria-hidden="true">⌄</span>
+              </button>
+              <div class="instrument-options" id="instrument-options" role="listbox" aria-label="Choose an instrument" hidden>
+                <button class="instrument-option selected" type="button" role="option" aria-selected="true" data-instrument="piano">
+                  <strong>Piano</strong><small>Warm &amp; clear</small>
+                </button>
+                <button class="instrument-option" type="button" role="option" aria-selected="false" data-instrument="violin">
+                  <strong>Violin</strong><small>Soft &amp; lyrical</small>
+                </button>
+                <button class="instrument-option" type="button" role="option" aria-selected="false" data-instrument="trumpet">
+                  <strong>Trumpet</strong><small>Bright &amp; bold</small>
+                </button>
+                <button class="instrument-option" type="button" role="option" aria-selected="false" data-instrument="synth">
+                  <strong>Night synth</strong><small>Deep &amp; electric</small>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="rail-section tempo-section">
+            <div class="section-heading">
+              <label class="eyebrow" for="tempo">Tempo</label>
+              <output class="mini-value" id="tempo-value" for="tempo">96 bpm</output>
+            </div>
+            <input id="tempo" type="range" min="56" max="160" value="96" step="1" />
+            <div class="range-labels" aria-hidden="true"><span>Slow</span><span>Fast</span></div>
+          </section>
+
+          <section class="rail-section room-tonality">
+            <span class="eyebrow">Shared compass</span>
+            <div class="tonality-row">
+              <label>Key
+                <select id="key-select" aria-label="Musical key">
+                  <option>C</option><option>D</option><option>E</option><option>F</option><option>G</option><option>A</option><option>B</option>
+                </select>
+              </label>
+              <label>Scale
+                <select id="scale-select" aria-label="Musical scale">
+                  <option value="major">Major</option>
+                  <option value="minor">Minor</option>
+                  <option value="pentatonic">Pentatonic</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section class="activity-section human-activity">
+            <div class="activity-heading">
+              <div>
+                <span class="eyebrow">Live score</span>
+                <h2>What just happened</h2>
+              </div>
+              <span class="event-count" id="event-count">0 notes</span>
+            </div>
+            <ol class="activity-list" id="activity-list" aria-live="polite">
+              <li class="empty-activity">
+                <span aria-hidden="true">♪</span>
+                <p>Your duet will unfold here.</p>
+              </li>
+            </ol>
+          </section>
+        </aside>
+
+        <section class="instrument-stage" id="instrument" aria-labelledby="stage-title">
+          <div class="stage-heading">
+            <div>
+              <span class="eyebrow" id="track-status">Your track · ready</span>
+              <h1 id="stage-title">Play the first phrase.</h1>
+              <p class="stage-intro">Your agent will listen, then answer.</p>
+            </div>
+            <div class="transport">
+              <button id="metronome" class="transport-button metronome-button" type="button" aria-pressed="false" title="Start or stop the metronome">
+                <span class="metronome-icon" aria-hidden="true"></span>
+                <span>Metronome</span>
+                <span class="transport-state" id="metronome-state">Off</span>
+              </button>
+              <button id="clear" class="transport-button" type="button" title="Clear notes and activity; room and musical settings stay unchanged">Clear notes</button>
+            </div>
+          </div>
+
+          <div class="score-window" aria-label="Recent notes in the room">
+            <div class="score-lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="playhead" id="playhead" aria-hidden="true"></div>
+            <div class="note-field" id="note-field" aria-hidden="true"></div>
+            <div class="score-empty" id="score-empty">
+              <span class="listening-rings" aria-hidden="true"><i></i><i></i><i></i></span>
+              <p>The room is listening</p>
+              <small>Touch a key or use your computer keyboard</small>
+            </div>
+          </div>
+
+          <div class="keyboard-shell">
+            <div class="keyboard-meta">
+              <span><kbd>A</kbd> through <kbd>;</kbd> to play</span>
+              <span id="octave-label">C4 — E5</span>
+            </div>
+            <div class="keyboard" id="keyboard" role="group" aria-label="Musical keyboard from C4 through E5"></div>
+          </div>
+
+          <div class="stage-footer">
+            <p><span class="pulse-mini" aria-hidden="true"></span><strong>Tip</strong> Play a short idea, pause, then invite your agent to answer.</p>
+            <button class="text-button" id="play-starter" type="button">Play a starter motif <span aria-hidden="true">→</span></button>
+          </div>
+        </section>
+
+        <aside class="collaboration-rail" aria-label="Collaboration activity">
+          <section class="agent-seat">
+            <div class="agent-orbit" aria-hidden="true"><span>✦</span></div>
+            <div>
+              <span class="eyebrow">Agent seat</span>
+              <h2 id="agent-name">Open chair</h2>
+              <p id="agent-message">Create a room, then share its key with your browser agent.</p>
+            </div>
+            <span class="seat-status" id="agent-status">Waiting</span>
+          </section>
+
+          <section class="agent-performance" aria-labelledby="agent-performance-heading">
+            <div class="agent-performance-heading">
+              <div>
+                <span class="eyebrow">Agent performance</span>
+                <h2 id="agent-performance-heading">Waiting for a phrase</h2>
+              </div>
+              <span class="agent-playing-dot" id="agent-playing-dot" aria-hidden="true"></span>
+            </div>
+            <dl class="agent-details">
+              <div><dt>Instrument</dt><dd id="agent-instrument">Not selected</dd></div>
+              <div><dt>Now</dt><dd id="agent-action">Listening</dd></div>
+            </dl>
+            <ol class="agent-activity-list" id="agent-activity-list" aria-live="polite">
+              <li class="empty-agent-activity">Agent notes and musical choices will appear here.</li>
+            </ol>
+          </section>
+
+          <section class="agent-prompt" id="agent-prompt">
+            <span class="spark" aria-hidden="true">✦</span>
+            <div>
+              <strong>Try saying</strong>
+              <p>“Join <span id="prompt-room">my room</span>, listen to my last phrase, then answer on violin.”</p>
+            </div>
+            <button class="icon-button small" id="copy-prompt" type="button" aria-label="Copy agent prompt">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v11H8z"></path><path d="M5 16H3V3h13v2"></path></svg>
+            </button>
+          </section>
+        </aside>
+      </div>
+      </div>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <noscript>
+      <div class="noscript">TuneIn needs JavaScript for its instruments and WebMCP tools.</div>
+    </noscript>
+  </body>
+</html>
