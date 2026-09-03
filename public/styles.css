@@ -1171,24 +1171,131 @@ kbd {
   .agent-performance { padding-top: 14px; padding-bottom: 14px; }
 }
 
-@media (max-width: 980px) {
-  body { overflow-y: auto; }
-  .workspace { height: auto; }
-  .workspace-shell { height: auto; min-height: calc(100dvh - 84px); }
-  .stage-grid { grid-template-columns: 200px minmax(500px, 1fr); }
+/* ChatGPT's split browser lands in this tablet-like range. Keep the whole
+   instrument in one viewport and turn collaboration into a compact dock. */
+@media (min-width: 641px) and (max-width: 1180px) {
+  body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-header { height: 54px; }
+
+  .workspace {
+    height: calc(100dvh - 54px);
+    padding: 8px 10px 10px;
+  }
+
+  .workspace-shell {
+    height: 100%;
+    min-height: 0;
+    border-radius: var(--radius);
+  }
+
+  .stage-grid {
+    height: 100%;
+    grid-template-columns: minmax(150px, 0.58fr) minmax(0, 2.35fr);
+    grid-template-rows: minmax(0, 1fr) clamp(150px, 23dvh, 188px);
+  }
+
+  .control-rail {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .instrument-stage {
+    grid-column: 2;
+    grid-row: 1;
+    overflow: hidden;
+    padding: 16px clamp(14px, 2vw, 22px);
+  }
+
+  .stage-heading { gap: 12px; }
+  .stage-heading h1 { font-size: clamp(27px, 4vw, 38px); }
+  .score-window { min-height: 96px; margin: 10px 0; }
+  .keyboard { height: clamp(120px, 16dvh, 138px); }
+  .stage-footer { margin-top: 8px; }
+
+  .rail-section { padding: 12px 14px; }
+  .instrument-section { padding-top: 11px; padding-bottom: 11px; }
+  .human-activity { padding: 13px 14px; }
+  .human-activity .activity-list { margin-top: 9px; }
+
   .collaboration-rail {
+    grid-row: 2;
     grid-column: 1 / -1;
+    min-height: 0;
     display: grid;
-    grid-template-columns: 0.8fr 1.5fr;
+    grid-template-columns: minmax(140px, 0.78fr) minmax(245px, 1.45fr) minmax(195px, 1fr);
+    overflow: hidden;
     border-top: 1px solid var(--line);
     border-left: 0;
   }
-  .agent-seat { border-right: 1px solid var(--line); border-bottom: 0; }
-  .agent-performance { min-height: 210px; }
-  .agent-prompt { grid-column: 1 / -1; margin-top: 0; }
+
+  .agent-seat {
+    min-width: 0;
+    grid-template-columns: 35px 1fr;
+    gap: 10px;
+    padding: 14px;
+    overflow: hidden;
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+  }
+
+  .agent-orbit { width: 35px; height: 35px; }
+  .agent-seat h2 { margin-top: 4px; font-size: 13px; }
+
+  .agent-performance {
+    min-height: 0;
+    padding: 13px 14px;
+    border-right: 1px solid var(--line);
+  }
+
+  .agent-performance-heading h2 { font-size: 13px; }
+  .agent-details { margin: 9px 0 7px; }
+  .agent-details div { padding: 7px 9px; }
+
+  .agent-activity-list li:not(.empty-agent-activity) {
+    grid-template-columns: 40px 1fr auto;
+    padding: 7px 0;
+  }
+
+  .empty-agent-activity { padding: 8px 0; }
+
+  .agent-prompt {
+    grid-column: 3;
+    align-self: center;
+    margin: 12px;
+    padding: 11px;
+  }
 }
 
-@media (max-width: 760px) {
+@media (min-width: 641px) and (max-width: 760px) {
+  .brand-line { display: none; }
+  .header-status { margin-left: auto; }
+  .instrument-current small { display: none; }
+  .agent-seat { grid-template-columns: 31px 1fr; padding-right: 10px; }
+  .agent-orbit { width: 31px; height: 31px; }
+  .agent-seat p { display: none; }
+  .agent-prompt { grid-template-columns: 1fr 32px; gap: 7px; margin: 9px; padding: 9px; }
+  .agent-prompt .spark { display: none; }
+  .agent-prompt p { font-size: 9px; }
+}
+
+@media (min-width: 641px) and (max-width: 1180px) and (max-height: 700px) {
+  .stage-grid { grid-template-rows: minmax(0, 1fr) 136px; }
+  .instrument-stage { padding-top: 12px; padding-bottom: 12px; }
+  .stage-intro { display: none; }
+  .score-window { min-height: 74px; margin: 8px 0; }
+  .keyboard { height: 108px; }
+  .stage-footer { margin-top: 6px; }
+  .agent-seat { padding: 11px 13px; }
+  .agent-performance { padding: 10px 13px; }
+  .agent-details { margin-top: 7px; }
+  .agent-prompt { margin: 9px 11px; padding: 9px 10px; }
+}
+
+@media (max-width: 640px) {
   .app-header { height: 59px; }
   .brand-line { display: none; }
   .header-status { margin-left: auto; }
