@@ -2,6 +2,8 @@ import {
   INSTRUMENTS,
   NOTES,
   analyzePerformance,
+  completedHumanTurnNotes,
+  createAgentReplyGate,
   eventSummary,
   groupPerformanceEvents,
   notationForDuration,
@@ -57,6 +59,7 @@ const sessionEventListeners = new Set();
 const agentReleaseListeners = new Set();
 const agentPerformanceTimers = new Set();
 const activeAgentVoices = new Set();
+const agentReplyGate = createAgentReplyGate();
 let toastTimer;
 let humanTrackTimer;
 
@@ -489,8 +492,10 @@ function loadSession() {
     state.key = saved.key || state.key;
     state.scale = saved.scale || state.scale;
     state.events = Array.isArray(saved.events) ? withStableTurnIds(saved.events.slice(-64)) : [];
+    agentReplyGate.reset(state.events);
   } catch {
     state.events = [];
+    agentReplyGate.reset();
   }
 }
 
@@ -534,6 +539,7 @@ function recordEvent(event) {
   }
   if (state.events.some((existing) => existing.id === completeEvent.id)) return completeEvent;
   state.events = [...state.events.slice(-63), completeEvent];
+  agentReplyGate.observe(completeEvent);
   notifySessionEvent(completeEvent);
   if (completeEvent.type === "note") visualNote(completeEvent);
   renderActivity();
@@ -658,6 +664,7 @@ function stopHumanNote(note, inputKey) {
   };
   if (eventIndex >= 0) state.events = state.events.with(eventIndex, completeEvent);
   else state.events = [...state.events.slice(-63), completeEvent];
+  agentReplyGate.observe(completeEvent);
   notifySessionEvent(completeEvent);
   visualNote(completeEvent);
   renderActivity();
@@ -711,6 +718,7 @@ function sessionState(eventLimit = 16) {
   return {
     session: "current_page",
     status: "active",
+    replyAllowed: agentReplyGate.canReply(),
     compass: { bpm: state.bpm, key: state.key, scale: state.scale },
     availableInstruments: INSTRUMENTS,
     participants: ["Human", ...(state.agentName ? [state.agentName] : [])],
@@ -728,11 +736,15 @@ function sessionState(eventLimit = 16) {
 }
 
 function listen(eventLimit = 16) {
-  const recent = state.events.filter((event) => event.type === "note").slice(-Math.max(3, Math.min(10, eventLimit)));
+  const pendingTurnId = agentReplyGate.pendingTurnId();
+  const recent = pendingTurnId
+    ? completedHumanTurnNotes(state.events, pendingTurnId, Math.max(3, Math.min(10, eventLimit)))
+    : [];
   const firstTimestamp = recent[0]?.timestamp || Date.now();
-  const analysis = analyzePerformance(recent, state);
+  const analysis = recent.length ? analyzePerformance(recent, state) : null;
   return {
     session: "current_page",
+    replyAllowed: recent.length > 0,
     compass: { bpm: state.bpm, key: state.key, scale: state.scale },
     analysis,
     notesHeard: recent.map((event) => ({
@@ -743,6 +755,9 @@ function listen(eventLimit = 16) {
       player: event.actor,
     })),
     safeNotesToTry: scaleNotes(state.key, state.scale, 4).filter((note) => NOTES.includes(note)),
+    nextAction: recent.length
+      ? "One agent reply is allowed for this human phrase. Perform it once, then wait for another human phrase."
+      : "Do not perform. No new completed human phrase is awaiting a reply; wait for the human to play.",
   };
 }
 
@@ -800,6 +815,7 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
           ok: true,
           outcome,
           session: "current_page",
+          replyAllowed: false,
           waitedSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
           message: "The human released your Agent Riff seat. End this task now and do not rejoin or call another Agent Riff tool unless the human explicitly asks you to start a new jam.",
           nextAction: "Finish the task now.",
@@ -816,6 +832,7 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
           ok: true,
           outcome,
           session: "current_page",
+          replyAllowed: true,
           waitedSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
           phrase: {
             noteCount: notes.length,
@@ -836,8 +853,10 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
         ok: true,
         outcome: "timeout",
         session: "current_page",
+        replyAllowed: false,
         waitedSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
-        message: "No new human phrase arrived before the bounded wait ended. Finish the jam unless the user asks to continue.",
+        message: "No new human phrase arrived before the bounded wait ended. Do not perform or start another wait. Finish the jam unless the user explicitly asks to continue.",
+        nextAction: "Finish without playing.",
       });
     };
 
@@ -882,7 +901,9 @@ function waitForHumanPhrase({ timeoutSeconds = 600, phrasePauseMs = 850 } = {}, 
 
 async function performPhrase(input, signal) {
   if (!state.agentName) throw new Error("Join the session before performing a phrase.");
+  if (signal?.aborted) throw new DOMException("The performance was cancelled.", "AbortError");
   const phrase = validatePhrase(input);
+  agentReplyGate.consume();
   const actor = state.agentName;
   const compassUpdate = Object.fromEntries(
     ["bpm", "key", "scale"]
@@ -944,6 +965,7 @@ async function performSet(input, signal) {
   if (signal?.aborted) throw new DOMException("The performance set was cancelled.", "AbortError");
 
   const performance = validatePerformanceSet(input, state);
+  agentReplyGate.consume();
   const actor = state.agentName;
   const acceptedAt = Date.now();
   const timers = [];
@@ -1083,7 +1105,7 @@ function toggleMetronome() {
 
 function bindUI() {
   $("#copy-prompt").addEventListener("click", async () => {
-    const prompt = `Use the current Agent Riff page at ${window.location.href}. Inspect and use the WebMCP site tools provided by the page instead of visual browser automation. Call riff_join_session, then stay for a live call-and-response jam. Listen and answer my first phrase. For normal replies, follow the returned reply plan and prefer compact score notation so the musical answer can develop before resolving. After each reply, call riff_wait_for_human_phrase; its result already includes the analysis needed for your next reply, so perform directly without calling riff_listen again. Wait for up to 10 minutes between turns.`;
+    const prompt = `Use the current Agent Riff page at ${window.location.href}. Inspect and use the WebMCP site tools provided by the page instead of visual browser automation. Call riff_join_session, then stay for a live call-and-response jam. Call riff_listen and answer only when replyAllowed is true. Connecting by itself never authorizes music. For normal replies, follow the returned reply plan and prefer compact score notation so the musical answer can develop before resolving. After each reply, call riff_wait_for_human_phrase; perform only when its outcome is human_phrase, then wait again. If the wait times out, finish without playing or starting another wait.`;
     await navigator.clipboard.writeText(prompt);
     showToast("Agent prompt copied");
   });
@@ -1137,6 +1159,7 @@ function bindUI() {
     state.events = [];
     state.agentPlaying.clear();
     state.waitCursor = null;
+    agentReplyGate.reset();
     saveSession();
     $("#note-field").replaceChildren();
     $("#score-empty").classList.remove("hidden");

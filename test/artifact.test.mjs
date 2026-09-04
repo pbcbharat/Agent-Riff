@@ -6,6 +6,7 @@ import worker from "../dist/server/index.js";
 test("production worker serves the app shell and static modules", async () => {
   const page = await worker.fetch(new Request("https://agent-riff.example/"));
   const script = await worker.fetch(new Request("https://agent-riff.example/webmcp.js"));
+  const appScript = await worker.fetch(new Request("https://agent-riff.example/app.js"));
 
   assert.equal(page.status, 200);
   assert.match(page.headers.get("content-type"), /text\/html/);
@@ -22,6 +23,9 @@ test("production worker serves the app shell and static modules", async () => {
   const toolScript = await script.text();
   assert.match(toolScript, /riff_perform_phrase/);
   assert.match(toolScript, /riff_perform_set/);
+  const applicationScript = await appScript.text();
+  assert.equal(applicationScript.match(/agentReplyGate\.consume\(\)/g)?.length, 2);
+  assert.match(applicationScript, /replyAllowed: false/);
 });
 
 test("production worker falls back to the app shell for navigation paths", async () => {

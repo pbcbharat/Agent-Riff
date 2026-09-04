@@ -4,6 +4,8 @@ import {
   MAX_PHRASE_STEPS,
   PUBLIC_DOMAIN_SONG_IDS,
   analyzePerformance,
+  completedHumanTurnNotes,
+  createAgentReplyGate,
   groupPerformanceEvents,
   isValidNote,
   notationForDuration,
@@ -15,6 +17,47 @@ import {
   validatePerformanceSet,
   validatePhrase,
 } from "../public/core.js";
+
+test("agent playback requires and consumes a completed human turn", () => {
+  const gate = createAgentReplyGate();
+  assert.equal(gate.canReply(), false);
+  assert.throws(() => gate.consume(), /no new completed human phrase/);
+
+  gate.observe({ id: "held", type: "note", role: "human", durationBeats: null });
+  assert.equal(gate.canReply(), false);
+
+  gate.observe({ id: "h1", turnId: "human-turn", type: "note", role: "human", durationBeats: 1 });
+  gate.observe({ id: "a1", type: "note", role: "agent", durationBeats: 1 });
+  assert.equal(gate.canReply(), true);
+  assert.equal(gate.consume(), "human-turn");
+  assert.equal(gate.canReply(), false);
+  assert.throws(() => gate.consume(), /idle timeout does not authorize music/);
+});
+
+test("agent reply gate restores only a human phrase not followed by an agent performance", () => {
+  const answered = [
+    { id: "h1", turnId: "human-turn", type: "note", role: "human", durationBeats: 1 },
+    { id: "a-turn", type: "phrase", role: "agent" },
+    { id: "a1", turnId: "a-turn", type: "note", role: "agent", durationBeats: 1 },
+  ];
+  const gate = createAgentReplyGate(answered);
+  assert.equal(gate.canReply(), false);
+
+  gate.reset([...answered, { id: "h2", turnId: "next-human-turn", type: "note", role: "human", durationBeats: 0.5 }]);
+  assert.equal(gate.canReply(), true);
+  assert.equal(gate.pendingTurnId(), "next-human-turn");
+});
+
+test("pending phrase selection never feeds agent notes back as human input", () => {
+  const notes = completedHumanTurnNotes([
+    { id: "h1", turnId: "human-turn", type: "note", role: "human", durationBeats: 1 },
+    { id: "a1", turnId: "human-turn", type: "note", role: "agent", durationBeats: 1 },
+    { id: "held", turnId: "human-turn", type: "note", role: "human", durationBeats: null },
+    { id: "h2", turnId: "other-turn", type: "note", role: "human", durationBeats: 1 },
+  ], "human-turn");
+
+  assert.deepEqual(notes.map(({ id }) => id), ["h1"]);
+});
 
 test("scientific notes map to useful frequencies", () => {
   assert.equal(isValidNote("C#4"), true);

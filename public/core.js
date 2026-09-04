@@ -9,6 +9,63 @@ export const KEYS = ["C", "D", "E", "F", "G", "A", "B"];
 export const MAX_PHRASE_STEPS = 128;
 export const MAX_SCORE_NOTES = 256;
 
+function isCompletedHumanNote(event) {
+  return event?.type === "note"
+    && event.role !== "agent"
+    && Number.isFinite(Number(event.durationBeats))
+    && Number(event.durationBeats) > 0;
+}
+
+function humanTurnId(event) {
+  return String(event?.turnId || event?.id || "");
+}
+
+function latestUnansweredHumanTurn(events = []) {
+  const lastAgentPhraseIndex = events.findLastIndex((event) => (
+    event?.type === "phrase" && event.role === "agent"
+  ));
+  const latestHumanNote = events.slice(lastAgentPhraseIndex + 1).filter(isCompletedHumanNote).at(-1);
+  return latestHumanNote ? humanTurnId(latestHumanNote) : null;
+}
+
+export function completedHumanTurnNotes(events = [], turnId, eventLimit = 10) {
+  const wantedTurnId = String(turnId || "");
+  if (!wantedTurnId) return [];
+  const boundedLimit = Math.max(1, Math.min(128, Math.round(Number(eventLimit) || 10)));
+  return events
+    .filter((event) => isCompletedHumanNote(event) && humanTurnId(event) === wantedTurnId)
+    .slice(-boundedLimit);
+}
+
+export function createAgentReplyGate(events = []) {
+  let pendingTurnId = latestUnansweredHumanTurn(events);
+
+  return {
+    reset(nextEvents = []) {
+      pendingTurnId = latestUnansweredHumanTurn(nextEvents);
+      return pendingTurnId;
+    },
+    observe(event) {
+      if (isCompletedHumanNote(event)) pendingTurnId = humanTurnId(event);
+      return pendingTurnId;
+    },
+    canReply() {
+      return Boolean(pendingTurnId);
+    },
+    pendingTurnId() {
+      return pendingTurnId;
+    },
+    consume() {
+      if (!pendingTurnId) {
+        throw new Error("Playback blocked: no new completed human phrase is awaiting a reply. Connecting or reaching an idle timeout does not authorize music. Wait for the human to play before performing.");
+      }
+      const consumedTurnId = pendingTurnId;
+      pendingTurnId = null;
+      return consumedTurnId;
+    },
+  };
+}
+
 const NOTE_INDEX = {
   C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5,
   "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,

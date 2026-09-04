@@ -33,6 +33,7 @@ test("Agent Riff exposes a focused WebMCP collaboration surface", () => {
   assert.deepEqual(performTool.inputSchema.anyOf, [{ required: ["score"] }, { required: ["steps"] }]);
   assert.deepEqual(performTool.inputSchema.properties.steps.items.properties.note.enum, NOTES);
   assert.match(performTool.description, /12–16 notes/);
+  assert.match(performTool.description, /blocks playback/);
   const setTool = tools.find(({ name }) => name === "riff_perform_set");
   assert.equal(setTool.inputSchema.properties.songs.maxItems, 8);
   assert.ok(setTool.inputSchema.properties.songs.items.properties.song.enum.includes("ode_to_joy"));
@@ -80,6 +81,7 @@ test("join tool takes the agent seat with an optional display name", async () =>
   assert.deepEqual(Object.keys(tool.inputSchema.properties), ["display_name"]);
   assert.match(result.message, /Listen before playing/);
   assert.match(result.message, /riff_wait_for_human_phrase/);
+  assert.match(result.message, /Connection alone does not authorize playback/);
 });
 
 test("wait tool forwards bounded session controls and cancellation", async () => {

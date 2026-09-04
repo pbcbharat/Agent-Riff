@@ -14,6 +14,7 @@ The useful part is the exchange: a human contributes taste, timing, and surprise
 - A scrolling, pitch-accurate notation view and accessible event history showing human and agent turns
 - Clickable turn cards that replay stored human or agent phrases, including simultaneous overlapping replays
 - A visible release control that ends an active agent wait and cancels queued agent playback
+- A one-reply-per-human-turn guard that blocks playback after connection, self-listening, and idle timeouts
 - Shared tempo, key, and scale controls
 - Seven imperative WebMCP tools for joining, observing, listening, waiting, performing, batching songs, and steering the session
 - A dependency-free build with automated tests and a Cloudflare Worker-compatible output
@@ -32,7 +33,7 @@ Agent Riff registers tools with the current `document.modelContext.registerTool(
 | `riff_perform_set` | Schedule up to eight catalog or compact-score songs in one call | Yes |
 | `riff_set_compass` | Change tempo, key, or scale at the person's request | Yes |
 
-Read-only and state-changing tools are annotated accordingly. Tool inputs use bounded JSON Schemas, phrases are validated again at execution time, and cancellation signals stop notes that have not yet been scheduled. Compact `NOTE/DURATION` scores keep fuller 12–16-note improvisations inexpensive, while explicit step objects remain available for exact overlapping timing. The public-domain catalog applies the same compact approach to complete-song requests.
+Read-only and state-changing tools are annotated accordingly. Tool inputs use bounded JSON Schemas, phrases are validated again at execution time, and cancellation signals stop notes that have not yet been scheduled. Playback is also turn-gated: only a new, completed human phrase grants one agent response, so connecting, listening to the agent's own output, or reaching an idle timeout cannot start music. Compact `NOTE/DURATION` scores keep fuller 12–16-note improvisations inexpensive, while explicit step objects remain available for exact overlapping timing. The public-domain catalog applies the same compact approach to complete-song requests.
 
 ## Run locally
 
